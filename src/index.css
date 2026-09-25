@@ -1,0 +1,69 @@
+:root {
+  --ink: #102033;
+  --muted: #3d5168;
+  --surface: #f4f7fb;
+  --white: #ffffff;
+  --navy: #0c1f38;
+  --navy-soft: #163154;
+  --accent: #0b6b63;
+  --accent-hover: #08544e;
+  --border: #d5dee8;
+  --shadow: 0 16px 40px rgba(12, 31, 56, 0.12);
+  --radius: 16px;
+  --sans: 'Segoe UI', system-ui, sans-serif;
+  --max: 1120px;
+
+  font-family: var(--sans);
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--surface);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+#root {
+  min-height: 100svh;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.6em;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid #f0c14b;
+  outline-offset: 3px;
+}

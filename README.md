@@ -1,46 +1,16 @@
-# VisionAble
+# React + Vite
 
-### AI-Powered Accessible & Secure Examination Platform
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-> **Making examinations more accessible for visually impaired candidates — without compromising examination integrity.**
+Currently, two official plugins are available:
 
-VisionAble is an accessibility-first examination platform designed to help visually impaired candidates participate in online examinations through voice interaction, text-to-speech, speech-to-text, keyboard accessibility, and configurable examination accommodations.
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-At the same time, the platform provides exam authorities with monitoring, event logging, audit trails, and examiner review tools to maintain examination integrity.
+## React Compiler
 
----
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-## 🌟 Why VisionAble?
+## Expanding the ESLint configuration
 
-Traditional online examination systems are often designed around visual interaction.
-
-For candidates with visual impairments, this can create additional challenges such as:
-
-- Difficulty navigating visual examination interfaces
-- Dependence on external assistance for reading or answering
-- Limited accessibility in conventional exam platforms
-- Difficulty maintaining accessibility while ensuring exam security
-- Lack of a unified platform for accessibility and examination monitoring
-
-VisionAble aims to bring these requirements together in a single platform.
-
----
-
-## 💡 Our Solution
-
-VisionAble combines **accessibility, voice interaction, examination management, and adaptive security** into one system.
-
-### Core idea
-
-```text
-Accessibility
-      +
-Voice Interaction
-      +
-Exam Engine
-      +
-Adaptive Monitoring
-      +
-Examiner Review
-      ↓
-Accessible & Secure Examination
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
