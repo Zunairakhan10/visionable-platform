@@ -1,69 +1,37 @@
-:root {
-  --ink: #102033;
-  --muted: #3d5168;
-  --surface: #f4f7fb;
-  --white: #ffffff;
-  --navy: #0c1f38;
-  --navy-soft: #163154;
-  --accent: #0b6b63;
-  --accent-hover: #08544e;
-  --border: #d5dee8;
-  --shadow: 0 16px 40px rgba(12, 31, 56, 0.12);
-  --radius: 16px;
-  --sans: 'Segoe UI', system-ui, sans-serif;
-  --max: 1120px;
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap');
 
+:root {
+  --bg: #060914;
+  --bg-soft: #0a1020;
+  --panel: rgba(13, 22, 42, 0.72);
+  --panel-solid: #0d162a;
+  --line: rgba(163, 181, 219, 0.15);
+  --line-bright: rgba(167, 217, 255, 0.28);
+  --ink: #f1f5ff;
+  --muted: #9ba9c4;
+  --muted-strong: #c5d0e5;
+  --cyan: #7be7f4;
+  --cyan-strong: #35cee2;
+  --purple: #a08bff;
+  --white: #fff;
+  --sans: 'Manrope', system-ui, sans-serif;
+  --mono: 'DM Mono', monospace;
+  --max: 1240px;
   font-family: var(--sans);
-  line-height: 1.5;
   color: var(--ink);
-  background: var(--surface);
+  background: var(--bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-html {
-  scroll-behavior: smooth;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-}
-
-body {
-  margin: 0;
-  min-width: 320px;
-}
-
-#root {
-  min-height: 100svh;
-}
-
-h1,
-h2,
-h3 {
-  line-height: 1.15;
-  letter-spacing: -0.03em;
-  margin: 0 0 0.6em;
-}
-
-p {
-  margin: 0;
-}
-
-a {
-  color: inherit;
-}
-
-:focus-visible {
-  outline: 3px solid #f0c14b;
-  outline-offset: 3px;
-}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; background: var(--bg); }
+body { margin: 0; min-width: 320px; background: var(--bg); }
+#root { min-height: 100svh; }
+h1, h2, h3, p { margin: 0; }
+h1, h2, h3 { line-height: 1.08; letter-spacing: -0.05em; }
+a { color: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }

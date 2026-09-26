@@ -1,46 +1,29 @@
 const features = [
-  {
-    title: 'Voice Interaction',
-    body: 'Ask for a question, repeat a section, or move ahead using clear spoken commands designed for exam flow.',
-  },
-  {
-    title: 'Text-to-Speech',
-    body: 'Hear questions, options, and instructions read aloud with a calm, consistent voice you can control.',
-  },
-  {
-    title: 'Speech-to-Text',
-    body: 'Speak your answers and have them transcribed accurately, so writing is never a barrier to completing an exam.',
-  },
-  {
-    title: 'Accessible Navigation',
-    body: 'Move through the paper with keyboard support, skip links, high contrast, and a layout that stays easy to follow.',
-  },
-  {
-    title: 'Secure Examination',
-    body: 'Protect exam integrity with a locked-down session, candidate identity checks, and a trustworthy submission trail.',
-  },
+  ['01', '◉', 'Voice Interaction', 'Navigate and interact with supported exam controls using voice commands.'],
+  ['02', '◌', 'Text-to-Speech', 'Questions and options can be read aloud for audio-first access.'],
+  ['03', '⌁', 'Speech-to-Text', 'Convert spoken responses into text for supported descriptive questions.'],
+  ['04', '↔', 'Accessible Navigation', 'Keyboard-friendly and screen-reader-friendly examination controls.'],
+  ['05', '◈', 'Adaptive Security', 'AI-assisted monitoring can flag unusual events for examiner review.'],
 ]
 
 function Features() {
   return (
-    <section id="features" className="features" aria-labelledby="features-heading">
-      <div className="section-intro">
-        <p className="eyebrow">Built-in support</p>
-        <h2 id="features-heading">Everything needed for an accessible exam</h2>
-        <p>
-          Five capabilities work together so visually impaired candidates can
-          take assessments independently and fairly.
-        </p>
+    <section id="features" className="features section-shell" aria-labelledby="features-heading">
+      <div className="section-heading">
+        <div className="section-kicker">Capabilities / 05</div>
+        <h2 id="features-heading">Support that meets candidates where they are.</h2>
+        <p>Thoughtful tools for a more independent exam experience — configurable by the examination authority.</p>
       </div>
-
-      <ul className="feature-grid">
-        {features.map((feature) => (
-          <li key={feature.title} className="feature-card">
-            <h3>{feature.title}</h3>
-            <p>{feature.body}</p>
-          </li>
+      <div className="feature-grid">
+        {features.map(([number, icon, title, body]) => (
+          <article className="feature-card" key={title}>
+            <div className="feature-top"><span className="feature-number">{number}</span><span className="feature-icon" aria-hidden="true">{icon}</span></div>
+            <h3>{title}</h3>
+            <p>{body}</p>
+            <span className="card-arrow" aria-hidden="true">↗</span>
+          </article>
         ))}
-      </ul>
+      </div>
     </section>
   )
 }
