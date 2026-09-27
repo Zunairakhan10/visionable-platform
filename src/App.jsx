@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import Navbar from './components/Navbar'
 import Hero from './components/Hero'
 import Features from './components/Features'
 import Footer from './components/Footer'
+import Exam from './components/exam/Exam'
 import './App.css'
 
 const steps = [
@@ -13,12 +15,26 @@ const steps = [
 ]
 
 function App() {
+  const [view, setView] = useState('landing')
+
+  const openExam = () => {
+    setView('exam')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const returnToLanding = () => {
+    setView('landing')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  if (view === 'exam') return <Exam onExit={returnToLanding} />
+
   return (
     <div className="page" id="top">
       <a className="skip-link" href="#main">Skip to main content</a>
-      <Navbar />
+      <Navbar onStartExam={openExam} />
       <main id="main">
-        <Hero />
+        <Hero onStartExam={openExam} />
 
         <section className="capability-strip" aria-label="VisionAble capabilities">
           <div className="capability-item"><span className="capability-icon">◉</span><span>Voice enabled</span></div>
@@ -73,38 +89,21 @@ function App() {
               <div className="progress-track"><span /></div>
               <p className="exam-label">DATA STRUCTURES · MULTIPLE CHOICE</p>
               <h3>Which data structure follows the FIFO principle?</h3>
-              <div className="answer-list">
-                <div className="answer-option"><span>A</span> Stack</div>
-                <div className="answer-option selected"><span>B</span> Queue <b className="selected-check">✓</b></div>
-                <div className="answer-option"><span>C</span> Tree</div>
-                <div className="answer-option"><span>D</span> Graph</div>
-              </div>
-              <div className="exam-footer"><span>◉ Voice active</span><span>◌ Audio enabled</span><span className="saved">✓ Answer saved</span><button type="button">Next question&nbsp; →</button></div>
+              <div className="answer-list"><div className="answer-option"><span>A</span> Stack</div><div className="answer-option selected"><span>B</span> Queue <b className="selected-check">✓</b></div><div className="answer-option"><span>C</span> Tree</div><div className="answer-option"><span>D</span> Graph</div></div>
+              <div className="exam-footer"><span>◉ Voice active</span><span>◌ Audio enabled</span><span className="saved">✓ Answer saved</span><button type="button" onClick={openExam}>Try exam prototype&nbsp; →</button></div>
             </div>
           </div>
         </section>
 
         <section className="security section-shell" aria-labelledby="security-heading">
           <div className="security-panel">
-            <div className="security-copy">
-              <div className="section-kicker">04 / Accountable security</div>
-              <h2 id="security-heading">Accessible doesn’t mean compromised.</h2>
-              <p>VisionAble supports configurable exam security while keeping approved accessibility behavior separate from suspicious-event detection.</p>
-            </div>
-            <div className="security-list">
-              <div><span className="security-icon">↯</span><span><strong>Event logging</strong><small>Timestamped examination-session events.</small></span></div>
-              <div><span className="security-icon">⌁</span><span><strong>AI-assisted monitoring</strong><small>Unusual events can be flagged for human review.</small></span></div>
-              <div><span className="security-icon">▣</span><span><strong>Examiner dashboard</strong><small>Review answers, sessions and flagged events.</small></span></div>
-            </div>
+            <div className="security-copy"><div className="section-kicker">04 / Accountable security</div><h2 id="security-heading">Accessible doesn’t mean compromised.</h2><p>VisionAble supports configurable exam security while keeping approved accessibility behavior separate from suspicious-event detection.</p></div>
+            <div className="security-list"><div><span className="security-icon">↯</span><span><strong>Event logging</strong><small>Timestamped examination-session events.</small></span></div><div><span className="security-icon">⌁</span><span><strong>AI-assisted monitoring</strong><small>Unusual events can be flagged for human review.</small></span></div><div><span className="security-icon">▣</span><span><strong>Examiner dashboard</strong><small>Review answers, sessions and flagged events.</small></span></div></div>
           </div>
         </section>
 
         <section id="get-started" className="final-cta section-shell" aria-labelledby="cta-heading">
-          <div className="cta-orb" aria-hidden="true" />
-          <div className="section-kicker">05 / Start with access</div>
-          <h2 id="cta-heading">Make examinations more accessible.</h2>
-          <p>Technology should remove barriers — not create them.</p>
-          <a className="btn btn-primary" href="#top">Get Started <span aria-hidden="true">→</span></a>
+          <div className="cta-orb" aria-hidden="true" /><div className="section-kicker">05 / Start with access</div><h2 id="cta-heading">Make examinations more accessible.</h2><p>Technology should remove barriers — not create them.</p><button className="btn btn-primary" type="button" onClick={openExam}>Try exam prototype <span aria-hidden="true">→</span></button>
         </section>
       </main>
       <Footer />
