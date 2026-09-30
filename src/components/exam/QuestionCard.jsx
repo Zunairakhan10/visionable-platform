@@ -1,20 +1,4 @@
-import { useState } from 'react'
-
-function QuestionCard({ question, questionIndex, selectedAnswer, isMarked, onAnswer, onToggleReview }) {
-  const [isReading, setIsReading] = useState(false)
-
-  const readQuestion = () => {
-    if (!('speechSynthesis' in window)) return
-    window.speechSynthesis.cancel()
-    const text = `Question ${questionIndex + 1}. ${question.question}. Options: ${question.options.map((option, index) => `${String.fromCharCode(65 + index)}, ${option}`).join('. ')}`
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.rate = 0.9
-    utterance.onstart = () => setIsReading(true)
-    utterance.onend = () => setIsReading(false)
-    utterance.onerror = () => setIsReading(false)
-    window.speechSynthesis.speak(utterance)
-  }
-
+function QuestionCard({ question, questionIndex, selectedAnswer, isMarked, speechSupported, isSpeaking, onReadQuestion, onStopReading, onAnswer, onToggleReview }) {
   return (
     <article className="question-card" aria-labelledby={`question-${question.id}`}>
       <div className="question-meta">
@@ -25,10 +9,10 @@ function QuestionCard({ question, questionIndex, selectedAnswer, isMarked, onAns
         <span className="question-number">Q{String(questionIndex + 1).padStart(2, '0')}</span>
         {question.question}
       </h2>
-      <button className="read-question" type="button" onClick={readQuestion} disabled={isReading}>
-        <span aria-hidden="true">◉</span> {isReading ? 'Reading question…' : 'Read question aloud'}
+      <button className="read-question" type="button" onClick={isSpeaking ? onStopReading : onReadQuestion} disabled={!speechSupported} title={!speechSupported ? 'Text-to-speech is unavailable in this browser' : undefined}>
+        <span aria-hidden="true">{isSpeaking ? '■' : '◉'}</span> {isSpeaking ? 'Stop reading' : 'Read question aloud'}
       </button>
-      {!('speechSynthesis' in window) && <p className="speech-note">Text-to-speech is not available in this browser.</p>}
+      {!speechSupported && <p className="speech-note">Text-to-speech is not available in this browser.</p>}
       <fieldset className="options-list">
         <legend className="sr-only">Choose one answer</legend>
         {question.options.map((option, index) => {
