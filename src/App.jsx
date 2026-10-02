@@ -4,6 +4,7 @@ import Hero from './components/Hero'
 import Features from './components/Features'
 import Footer from './components/Footer'
 import Exam from './components/exam/Exam'
+import ExaminerDashboard from './components/examiner/ExaminerDashboard'
 import './App.css'
 
 const steps = [
@@ -27,12 +28,18 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const openExaminerDashboard = () => {
+    setView('examiner')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   if (view === 'exam') return <Exam onExit={returnToLanding} />
+  if (view === 'examiner') return <ExaminerDashboard onExit={returnToLanding} />
 
   return (
     <div className="page" id="top">
       <a className="skip-link" href="#main">Skip to main content</a>
-      <Navbar onStartExam={openExam} />
+      <Navbar onStartExam={openExam} onOpenDashboard={openExaminerDashboard} />
       <main id="main">
         <Hero onStartExam={openExam} />
 
