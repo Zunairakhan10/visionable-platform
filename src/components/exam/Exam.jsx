@@ -6,8 +6,17 @@ import AccessibilityToolbar from './AccessibilityToolbar'
 import ExamTimer from './ExamTimer'
 import QuestionCard from './QuestionCard'
 import QuestionNavigator from './QuestionNavigator'
+//simmy added
+import { useExamMonitoring } from '../../hooks/useExamMonitoring'
 
 function Exam({ onExit }) {
+  //simmy added
+  const handleMonitoringEvent = useCallback((event) => {
+  console.log('Monitoring event:', event)
+}, [])
+
+useExamMonitoring(handleMonitoringEvent)
+
   const [examState, setExamState] = useState('instructions')
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState({})
