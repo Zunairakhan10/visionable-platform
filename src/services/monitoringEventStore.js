@@ -1,6 +1,7 @@
 const EVENTS_STORAGE_KEY = 'visionable:monitoring-events'
 const CANDIDATE_ID_STORAGE_KEY = 'visionable:candidate-id'
 const listeners = new Set()
+export const DEFAULT_CANDIDATE_ID = 'VA-1048'
 
 function createId(prefix) {
   const value = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -9,11 +10,28 @@ function createId(prefix) {
 
 export function getCandidateId() {
   const storedId = window.localStorage.getItem(CANDIDATE_ID_STORAGE_KEY)
-  if (storedId) return storedId
+  if (storedId && /^VA-\d{4}$/.test(storedId)) return storedId
 
-  const candidateId = createId('candidate')
-  window.localStorage.setItem(CANDIDATE_ID_STORAGE_KEY, candidateId)
-  return candidateId
+  window.localStorage.setItem(CANDIDATE_ID_STORAGE_KEY, DEFAULT_CANDIDATE_ID)
+
+  if (storedId) {
+    const events = getMonitoringEvents()
+    if (Array.isArray(events)) {
+      let eventsChanged = false
+      const migratedEvents = events.map((event) => {
+        if (event.candidateId !== storedId) return event
+        eventsChanged = true
+        return { ...event, candidateId: DEFAULT_CANDIDATE_ID }
+      })
+
+      if (eventsChanged) {
+        window.localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(migratedEvents))
+        notifyListeners()
+      }
+    }
+  }
+
+  return DEFAULT_CANDIDATE_ID
 }
 
 export function getMonitoringEvents() {

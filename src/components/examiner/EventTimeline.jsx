@@ -18,7 +18,7 @@ function EventTimeline({ events }) {
           <span className="timeline-marker" aria-hidden="true"><i /></span>
           <div className="timeline-content">
             <div className="timeline-event-top"><strong>{event.type}</strong><time dateTime={event.timestamp}>{formatEventTime(event.timestamp)}</time></div>
-            <div className="timeline-event-meta"><span>{event.candidateId}</span><span className={`event-review-status status-${event.status}`}>{event.status === 'needs_review' ? 'Needs review' : 'Logged'}</span></div>
+            <div className="timeline-event-meta"><span>Candidate: {event.candidateId}</span><span className={`event-review-status status-${event.status}`}>{event.status === 'needs_review' ? 'Needs review' : 'Logged'}</span></div>
           </div>
         </li>
       ))}
