@@ -5,6 +5,12 @@ const FACE_DETECTOR_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models
 const PRESENCE_STABILITY_MS = 1500
 const DETECTION_INTERVAL_MS = 200
 
+function getDetectionState(faceCount) {
+  if (faceCount === 0) return 'CANDIDATE_ABSENT'
+  if (faceCount === 1) return 'CANDIDATE_PRESENT'
+  return 'MULTIPLE_PEOPLE_DETECTED'
+}
+
 function getCameraErrorMessage(error) {
   if (error?.name === 'NotSupportedError') {
     return 'Camera access is unavailable in this browser or page context. Use a supported browser over HTTPS; you can continue the exam.'
@@ -30,8 +36,8 @@ export function useCameraMonitoring(isActive, onFeedback) {
     let video
     let detector
     let timeoutId
-    let reportedPresence = null
-    let pendingPresence = null
+    let reportedState = null
+    let pendingState = null
     let pendingSince = 0
     let cameraTrack
     let cameraEnded = false
@@ -51,28 +57,28 @@ export function useCameraMonitoring(isActive, onFeedback) {
       onFeedback('The camera connection ended. No candidate-absent event was recorded; camera monitoring is unavailable.', 'error')
     }
 
-    const reportPresence = (present) => {
-      if (reportedPresence === present) return
+    const reportDetectionState = (state) => {
+      if (reportedState === state) return
 
-      reportedPresence = present
+      reportedState = state
       recordMonitoringEvent({
         candidateId: getCandidateId(),
-        type: present ? 'CANDIDATE_PRESENT' : 'CANDIDATE_ABSENT',
+        type: state,
         timestamp: new Date().toISOString(),
-        severity: present ? 'info' : 'warning',
-        status: present ? 'logged' : 'needs_review',
+        severity: state === 'CANDIDATE_PRESENT' ? 'info' : 'warning',
+        status: state === 'CANDIDATE_PRESENT' ? 'logged' : 'needs_review',
       })
     }
 
     const detectPresence = () => {
       if (cancelled || cameraEnded || !detector || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return
 
-      const present = detector.detectForVideo(video, performance.now()).detections.length > 0
-      if (present !== pendingPresence) {
-        pendingPresence = present
+      const state = getDetectionState(detector.detectForVideo(video, performance.now()).detections.length)
+      if (state !== pendingState) {
+        pendingState = state
         pendingSince = performance.now()
-      } else if (reportedPresence !== present && performance.now() - pendingSince >= PRESENCE_STABILITY_MS) {
-        reportPresence(present)
+      } else if (reportedState !== state && performance.now() - pendingSince >= PRESENCE_STABILITY_MS) {
+        reportDetectionState(state)
       }
     }
 
