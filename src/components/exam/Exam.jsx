@@ -6,16 +6,11 @@ import AccessibilityToolbar from './AccessibilityToolbar'
 import ExamTimer from './ExamTimer'
 import QuestionCard from './QuestionCard'
 import QuestionNavigator from './QuestionNavigator'
-//simmy added
 import { useExamMonitoring } from '../../hooks/useExamMonitoring'
+import { useCameraMonitoring } from '../../hooks/useCameraMonitoring'
 
 function Exam({ onExit }) {
-  //simmy added
-  const handleMonitoringEvent = useCallback((event) => {
-  console.log('Monitoring event:', event)
-}, [])
-
-useExamMonitoring(handleMonitoringEvent)
+  useExamMonitoring()
 
   const [examState, setExamState] = useState('instructions')
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -34,6 +29,8 @@ useExamMonitoring(handleMonitoringEvent)
   const showFeedback = useCallback((message, tone = 'info') => {
     setFeedback({ message, tone })
   }, [])
+
+  useCameraMonitoring(examState === 'active', showFeedback)
 
   const readCurrentQuestion = useCallback(() => {
     const optionText = currentQuestion.options.map((option, index) => `${String.fromCharCode(65 + index)}, ${option}`).join('. ')
@@ -125,7 +122,7 @@ useExamMonitoring(handleMonitoringEvent)
         <section className="instructions-card" aria-labelledby="instructions-heading">
           <div className="instructions-intro"><span className="exam-kicker">Candidate examination portal</span><h1 id="instructions-heading">General Aptitude &amp; Awareness Test</h1><p>Read the instructions carefully before beginning. This sample demonstrates the VisionAble accessible CBT experience.</p></div>
           <div className="instructions-details"><div><span>08</span><small>Questions</small></div><div><span>30 min</span><small>Duration</small></div><div><span>01</span><small>Correct answer</small></div></div>
-          <div className="instruction-columns"><div><h2>Before you begin</h2><ul><li>Use the question palette to move directly between questions.</li><li>Your answer is saved locally when you select an option.</li><li>Use “Mark for review” when you want to revisit a question.</li></ul></div><div><h2>Accessibility foundation</h2><ul><li>All controls are keyboard accessible with visible focus states.</li><li>Use “Read question aloud” where browser speech synthesis is supported.</li><li>Approved accommodations will ultimately be configured by the examination authority.</li></ul></div></div>
+          <div className="instruction-columns"><div><h2>Before you begin</h2><ul><li>Use the question palette to move directly between questions.</li><li>Your answer is saved locally when you select an option.</li><li>Use “Mark for review” when you want to revisit a question.</li><li>Camera access is requested during the exam for on-device presence signals. Declining it will not prevent you from continuing.</li></ul></div><div><h2>Accessibility foundation</h2><ul><li>All controls are keyboard accessible with visible focus states.</li><li>Use “Read question aloud” where browser speech synthesis is supported.</li><li>Approved accommodations will ultimately be configured by the examination authority.</li></ul></div></div>
           <div className="instructions-footer"><span>By continuing, you are entering a frontend-only prototype.</span><button className="exam-primary-button" type="button" onClick={() => setExamState('active')}>Begin examination <span aria-hidden="true">→</span></button></div>
         </section>
       </main>
