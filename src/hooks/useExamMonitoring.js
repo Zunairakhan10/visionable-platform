@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
-import { recordMonitoringEvent } from '../services/monitoringEventStore'
+import { getCandidateId, recordMonitoringEvent } from '../services/monitoringEventStore'
 
 export function useExamMonitoring(onEvent) {
   useEffect(() => {
+    const candidateId = getCandidateId()
     const reportEvent = (event) => {
       const recordedEvent = recordMonitoringEvent(event)
       onEvent?.(recordedEvent)
@@ -11,6 +12,7 @@ export function useExamMonitoring(onEvent) {
     const handleVisibilityChange = () => {
       if (document.hidden) {
         reportEvent({
+          candidateId,
           type: 'FOCUS_LOST',
           timestamp: new Date().toISOString(),
           severity: 'warning',
@@ -18,6 +20,7 @@ export function useExamMonitoring(onEvent) {
         })
       } else {
         reportEvent({
+          candidateId,
           type: 'FOCUS_RESTORED',
           timestamp: new Date().toISOString(),
           severity: 'info',

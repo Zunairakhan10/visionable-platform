@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { getMonitoringEvents, subscribeToMonitoringEvents } from '../../services/monitoringEventStore'
+import { DEFAULT_CANDIDATE_ID, getMonitoringEvents, subscribeToMonitoringEvents } from '../../services/monitoringEventStore'
 import CandidateTable from './CandidateTable'
 import EventTimeline from './EventTimeline'
 import './ExaminerDashboard.css'
 
 const demoCandidates = [
-  { id: 'VA-1048', exam: 'General Aptitude & Awareness', progress: 72 },
+  { id: DEFAULT_CANDIDATE_ID, exam: 'General Aptitude & Awareness', progress: 72 },
   { id: 'VA-1052', exam: 'General Aptitude & Awareness', progress: 46 },
   { id: 'VA-1061', exam: 'General Aptitude & Awareness', progress: 88 },
   { id: 'VA-1064', exam: 'General Aptitude & Awareness', progress: 31 },
