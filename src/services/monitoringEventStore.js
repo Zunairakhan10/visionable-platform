@@ -64,6 +64,32 @@ export function recordMonitoringEvent(event) {
   return recordedEvent
 }
 
+export function reviewMonitoringEvent(eventId, action, note = '') {
+  if (action !== 'no_issue' && action !== 'escalated') {
+    throw new Error(`Unsupported monitoring event review action: ${action}`)
+  }
+
+  const events = getMonitoringEvents()
+  const eventIndex = events.findIndex((event) => event.id === eventId)
+  if (eventIndex === -1) {
+    throw new Error(`Monitoring event not found: ${eventId}`)
+  }
+
+  const updatedEvent = {
+    ...events[eventIndex],
+    status: action === 'no_issue' ? 'reviewed' : 'escalated',
+    review: {
+      action,
+      note: note.trim(),
+      reviewedAt: new Date().toISOString(),
+    },
+  }
+  events[eventIndex] = updatedEvent
+  window.localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(events))
+  notifyListeners()
+  return updatedEvent
+}
+
 export function subscribeToMonitoringEvents(listener) {
   listeners.add(listener)
 
