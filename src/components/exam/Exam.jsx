@@ -8,6 +8,7 @@ import QuestionCard from './QuestionCard'
 import QuestionNavigator from './QuestionNavigator'
 import { useExamMonitoring } from '../../hooks/useExamMonitoring'
 import { useCameraMonitoring } from '../../hooks/useCameraMonitoring'
+import { useAudioMonitoring } from '../../hooks/useAudioMonitoring'
 
 function Exam({ onExit }) {
   useExamMonitoring()
@@ -31,6 +32,7 @@ function Exam({ onExit }) {
   }, [])
 
   useCameraMonitoring(examState === 'active', showFeedback)
+  useAudioMonitoring(examState === 'active', showFeedback)
 
   const readCurrentQuestion = useCallback(() => {
     const optionText = currentQuestion.options.map((option, index) => `${String.fromCharCode(65 + index)}, ${option}`).join('. ')
