@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { examDurationMinutes, questions } from '../../data/questions'
 import { useSpeechSynthesis } from '../../hooks/useSpeechSynthesis'
 import { useVoiceCommands } from '../../hooks/useVoiceCommands'
@@ -12,7 +12,6 @@ import { useAudioMonitoring } from '../../hooks/useAudioMonitoring'
 
 function Exam({ onExit }) {
   useExamMonitoring()
-
   const [examState, setExamState] = useState('instructions')
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState({})
@@ -21,38 +20,61 @@ function Exam({ onExit }) {
   const [largeText, setLargeText] = useState(false)
   const [highContrast, setHighContrast] = useState(false)
   const [feedback, setFeedback] = useState({ message: '', tone: 'info' })
-  const { supported: speechSupported, isSpeaking, speak, stop: stopReading } = useSpeechSynthesis()
-
+  const [audioFirst, setAudioFirst] = useState(false)
+  const [remainingSeconds, setRemainingSeconds] = useState(examDurationMinutes * 60)
+  const spokenQuestionRef = useRef('')
+  const startVoiceAfterAudioRef = useRef(false)
+  const pauseVoiceRef = useRef(() => {})
+  const resumeVoiceRef = useRef(() => {})
+  const { supported: speechSupported, isSpeaking, isPaused, speak, pause: pauseReading, resume: resumeReading, stop: stopReading } = useSpeechSynthesis()
   const answeredCount = Object.keys(answers).length
   const currentQuestion = questions[currentIndex]
   const isSubmitted = examState === 'submitted'
-
-  const showFeedback = useCallback((message, tone = 'info') => {
-    setFeedback({ message, tone })
-  }, [])
+  const showFeedback = useCallback((message, tone = 'info') => setFeedback({ message, tone }), [])
 
   useCameraMonitoring(examState === 'active', showFeedback)
   useAudioMonitoring(examState === 'active', showFeedback)
 
-  const readCurrentQuestion = useCallback(() => {
+  const speakMessage = useCallback((text, feedbackMessage = text, onEnd) => {
+    pauseVoiceRef.current()
+    const didSpeak = speak(text, { onEnd: () => {
+      resumeVoiceRef.current()
+      onEnd?.()
+    } })
+    if (didSpeak) showFeedback(feedbackMessage, 'info')
+    else {
+      resumeVoiceRef.current()
+      onEnd?.()
+      showFeedback('Text-to-speech is not supported in this browser.', 'error')
+    }
+  }, [showFeedback, speak])
+
+  const readCurrentQuestion = useCallback((onEnd) => {
     const optionText = currentQuestion.options.map((option, index) => `${String.fromCharCode(65 + index)}, ${option}`).join('. ')
-    const didSpeak = speak(`Question ${currentIndex + 1}. ${currentQuestion.question}. Options: ${optionText}`)
-    if (didSpeak) showFeedback('Reading the current question and available options aloud.', 'info')
-    else showFeedback('Text-to-speech is not supported in this browser.', 'error')
-  }, [currentIndex, currentQuestion, showFeedback, speak])
+    speakMessage(`Question ${currentIndex + 1}. ${currentQuestion.question}. Options: ${optionText}`, 'Reading the current question and available options aloud.', onEnd)
+  }, [currentIndex, currentQuestion, speakMessage])
+
+  const readOptions = useCallback(() => {
+    const optionText = currentQuestion.options.map((option, index) => `${String.fromCharCode(65 + index)}, ${option}`).join('. ')
+    speakMessage(`Options: ${optionText}`, 'Reading the answer options aloud.')
+  }, [currentQuestion, speakMessage])
 
   const selectAnswer = useCallback((answerIndex) => {
     setAnswers((current) => ({ ...current, [currentIndex]: answerIndex }))
-  }, [currentIndex])
+    const letter = String.fromCharCode(65 + answerIndex)
+    speakMessage(`Option ${letter} selected. Answer saved.`, `Option ${letter} selected. Answer saved.`)
+  }, [currentIndex, speakMessage])
 
   const toggleReview = useCallback(() => {
+    const willMark = !markedQuestions.has(currentIndex)
     setMarkedQuestions((current) => {
       const next = new Set(current)
       if (next.has(currentIndex)) next.delete(currentIndex)
       else next.add(currentIndex)
       return next
     })
-  }, [currentIndex])
+    speakMessage(willMark ? 'Question marked for review.' : 'Question removed from review.', willMark ? 'Marked for review.' : 'Removed from review.')
+  }, [currentIndex, markedQuestions, speakMessage])
 
   const goNext = useCallback(() => setCurrentIndex((current) => Math.min(questions.length - 1, current + 1)), [])
   const goPrevious = useCallback(() => setCurrentIndex((current) => Math.max(0, current - 1)), [])
@@ -61,21 +83,25 @@ function Exam({ onExit }) {
     setShowSubmitDialog(false)
     setExamState('submitted')
     stopReading()
+    pauseVoiceRef.current = () => {}
+    resumeVoiceRef.current = () => {}
   }, [stopReading])
 
   const handleTimeUp = useCallback(() => {
     setExamState('submitted')
     stopReading()
+    pauseVoiceRef.current = () => {}
+    resumeVoiceRef.current = () => {}
   }, [stopReading])
 
-  const clearAnswer = () => {
+  const clearAnswer = useCallback(() => {
     setAnswers((current) => {
       const next = { ...current }
       delete next[currentIndex]
       return next
     })
-    showFeedback('Response cleared.', 'info')
-  }
+    speakMessage('Response cleared.', 'Response cleared.')
+  }, [currentIndex, speakMessage])
 
   const handleVoiceCommand = useCallback((transcript) => {
     const command = transcript.toLowerCase().replace(/[?.!,]/g, '').trim()
@@ -83,23 +109,57 @@ function Exam({ onExit }) {
       action()
       showFeedback(`Voice command recognized: ${label}`, 'success')
     }
-
+    if (command.includes('how much time') || command.includes('time left') || command.includes('remaining time')) {
+      const minutes = Math.floor(remainingSeconds / 60)
+      const seconds = remainingSeconds % 60
+      return recognized('Time remaining', () => speakMessage(`You have ${minutes} minutes and ${seconds} seconds remaining.`, 'Time remaining announced.'))
+    }
+    if (command.includes('read options') || command.includes('read the options')) return recognized('Read options', readOptions)
+    if (command.includes('repeat') || command.includes('read question')) return recognized('Read question', readCurrentQuestion)
     if (command.includes('next')) return recognized('Next question', goNext)
     if (command.includes('previous') || command.includes('back')) return recognized('Previous question', goPrevious)
-    if (command.includes('repeat') || command.includes('read question')) return recognized('Read question', readCurrentQuestion)
     if (command.includes('mark') && command.includes('review')) return recognized(markedQuestions.has(currentIndex) ? 'Unmark for review' : 'Mark for review', toggleReview)
-    if (command.includes('submit')) return recognized('Submit exam', () => setShowSubmitDialog(true))
-
+    if (command.includes('submit')) return recognized('Submit exam', () => {
+      setShowSubmitDialog(true)
+      speakMessage('Submission confirmation is open. Choose Submit exam to confirm, or Continue exam to cancel.', 'Submission confirmation is open.')
+    })
     const optionMatch = command.match(/(?:select|choose)?\s*(?:option\s*)?([abcd])\b/)
     if (optionMatch) {
       const optionIndex = optionMatch[1].charCodeAt(0) - 97
       return recognized(`Select option ${optionMatch[1].toUpperCase()}`, () => selectAnswer(optionIndex))
     }
-
     showFeedback('Sorry, command not recognized. Try: “Next question”.', 'error')
-  }, [currentIndex, goNext, goPrevious, markedQuestions, readCurrentQuestion, selectAnswer, showFeedback, toggleReview])
+  }, [currentIndex, goNext, goPrevious, markedQuestions, readCurrentQuestion, readOptions, remainingSeconds, selectAnswer, showFeedback, speakMessage, toggleReview])
 
-  const { supported: voiceSupported, status: voiceStatus, startListening, stopListening } = useVoiceCommands({ onCommand: handleVoiceCommand, onFeedback: showFeedback })
+  const { supported: voiceSupported, isListening, status: voiceStatus, startListening, stopListening, pauseListening, resumeListening } = useVoiceCommands({ onCommand: handleVoiceCommand, onFeedback: showFeedback })
+
+  useEffect(() => {
+    pauseVoiceRef.current = pauseListening
+    resumeVoiceRef.current = resumeListening
+  }, [pauseListening, resumeListening])
+
+  const stopReadingAndResumeVoice = useCallback(() => {
+    stopReading()
+    resumeVoiceRef.current()
+  }, [stopReading])
+
+  useEffect(() => {
+    if (!audioFirst || examState !== 'active') return
+    const questionKey = `${examState}-${currentIndex}`
+    if (spokenQuestionRef.current === questionKey) return
+    spokenQuestionRef.current = questionKey
+    const shouldStartVoice = startVoiceAfterAudioRef.current
+    readCurrentQuestion(shouldStartVoice ? () => {
+      startVoiceAfterAudioRef.current = false
+      startListening()
+    } : undefined)
+  }, [audioFirst, currentIndex, examState, readCurrentQuestion, startListening])
+
+  const startExam = useCallback(() => {
+    startVoiceAfterAudioRef.current = true
+    setAudioFirst(true)
+    setExamState('active')
+  }, [])
 
   const examProgress = useMemo(() => Math.round(((currentIndex + 1) / questions.length) * 100), [currentIndex])
   const examClassName = `exam-app active-exam ${largeText ? 'large-text' : ''} ${highContrast ? 'high-contrast' : ''}`
@@ -124,8 +184,8 @@ function Exam({ onExit }) {
         <section className="instructions-card" aria-labelledby="instructions-heading">
           <div className="instructions-intro"><span className="exam-kicker">Candidate examination portal</span><h1 id="instructions-heading">General Aptitude &amp; Awareness Test</h1><p>Read the instructions carefully before beginning. This sample demonstrates the VisionAble accessible CBT experience.</p></div>
           <div className="instructions-details"><div><span>08</span><small>Questions</small></div><div><span>30 min</span><small>Duration</small></div><div><span>01</span><small>Correct answer</small></div></div>
-          <div className="instruction-columns"><div><h2>Before you begin</h2><ul><li>Use the question palette to move directly between questions.</li><li>Your answer is saved locally when you select an option.</li><li>Use “Mark for review” when you want to revisit a question.</li><li>Camera access is requested during the exam for on-device presence signals. Declining it will not prevent you from continuing.</li></ul></div><div><h2>Accessibility foundation</h2><ul><li>All controls are keyboard accessible with visible focus states.</li><li>Use “Read question aloud” where browser speech synthesis is supported.</li><li>Approved accommodations will ultimately be configured by the examination authority.</li></ul></div></div>
-          <div className="instructions-footer"><span>By continuing, you are entering a frontend-only prototype.</span><button className="exam-primary-button" type="button" onClick={() => setExamState('active')}>Begin examination <span aria-hidden="true">→</span></button></div>
+          <div className="instruction-columns"><div><h2>Before you begin</h2><ul><li>Use the question palette to move directly between questions.</li><li>Your answer is saved locally when you select an option.</li><li>Use “Mark for review” when you want to revisit a question.</li><li>Audio-first mode reads each question and its options automatically when the exam starts and when you navigate.</li></ul></div><div><h2>Accessibility foundation</h2><ul><li>All controls are keyboard accessible with visible focus states.</li><li>Use “Pause audio”, “Resume audio”, and “Repeat question” as needed.</li><li>Voice commands stay available after each command when browser recognition is supported.</li><li>Approved accommodations will ultimately be configured by the examination authority.</li></ul></div></div>
+          <div className="instructions-footer"><span>By continuing, you are entering a frontend-only prototype.</span><button className="exam-primary-button" type="button" onClick={startExam}>Begin examination <span aria-hidden="true">→</span></button></div>
         </section>
       </main>
     )
@@ -133,12 +193,12 @@ function Exam({ onExit }) {
 
   return (
     <main className={examClassName} id="main">
-      <header className="exam-header"><button className="exam-brand" type="button" onClick={onExit} aria-label="Return to VisionAble home"><span className="brand-mark">V</span><span>VISION<span>ABLE</span></span></button><div className="exam-title"><span>GENERAL APTITUDE &amp; AWARENESS</span><small>Candidate examination portal</small></div><ExamTimer durationMinutes={examDurationMinutes} isRunning={examState === 'active'} onTimeUp={handleTimeUp} /></header>
+      <header className="exam-header"><button className="exam-brand" type="button" onClick={onExit} aria-label="Return to VisionAble home"><span className="brand-mark">V</span><span>VISION<span>ABLE</span></span></button><div className="exam-title"><span>GENERAL APTITUDE &amp; AWARENESS</span><small>Candidate examination portal</small></div><ExamTimer durationMinutes={examDurationMinutes} isRunning={examState === 'active'} onTimeUp={handleTimeUp} onTimeChange={setRemainingSeconds} /></header>
       <div className="exam-layout">
         <section className="question-area" aria-label="Current examination question">
           <div className="exam-breadcrumb"><span>EXAM / SECTION 01</span><span>{examProgress}% complete</span></div><div className="exam-progress-bar"><span style={{ width: `${examProgress}%` }} /></div>
-          <AccessibilityToolbar speechSupported={speechSupported} isSpeaking={isSpeaking} onReadQuestion={readCurrentQuestion} onStopReading={stopReading} voiceSupported={voiceSupported} voiceStatus={voiceStatus} onStartVoice={startListening} onStopVoice={stopListening} largeText={largeText} highContrast={highContrast} onToggleLargeText={() => setLargeText((value) => !value)} onToggleHighContrast={() => setHighContrast((value) => !value)} feedback={feedback} />
-          <QuestionCard question={currentQuestion} questionIndex={currentIndex} selectedAnswer={answers[currentIndex]} isMarked={markedQuestions.has(currentIndex)} speechSupported={speechSupported} isSpeaking={isSpeaking} onReadQuestion={readCurrentQuestion} onStopReading={stopReading} onAnswer={selectAnswer} onToggleReview={toggleReview} />
+          <AccessibilityToolbar speechSupported={speechSupported} isSpeaking={isSpeaking} isPaused={isPaused} onReadQuestion={readCurrentQuestion} onReadOptions={readOptions} onPauseReading={pauseReading} onResumeReading={resumeReading} onStopReading={stopReadingAndResumeVoice} voiceSupported={voiceSupported} isListening={isListening} voiceStatus={voiceStatus} onStartVoice={startListening} onStopVoice={stopListening} largeText={largeText} highContrast={highContrast} onToggleLargeText={() => setLargeText((value) => !value)} onToggleHighContrast={() => setHighContrast((value) => !value)} feedback={feedback} />
+          <QuestionCard question={currentQuestion} questionIndex={currentIndex} selectedAnswer={answers[currentIndex]} isMarked={markedQuestions.has(currentIndex)} speechSupported={speechSupported} isSpeaking={isSpeaking} onReadQuestion={readCurrentQuestion} onStopReading={stopReadingAndResumeVoice} onAnswer={selectAnswer} onToggleReview={toggleReview} />
           <div className="question-navigation"><button className="exam-secondary-button" type="button" onClick={goPrevious} disabled={currentIndex === 0}>← Previous</button><button className="clear-button" type="button" onClick={clearAnswer} disabled={answers[currentIndex] === undefined}>Clear response</button>{currentIndex === questions.length - 1 ? <button className="exam-primary-button" type="button" onClick={() => setShowSubmitDialog(true)}>Submit exam <span aria-hidden="true">→</span></button> : <button className="exam-primary-button" type="button" onClick={goNext}>Next question <span aria-hidden="true">→</span></button>}</div>
         </section>
         <QuestionNavigator questions={questions} answers={answers} markedQuestions={markedQuestions} currentIndex={currentIndex} onNavigate={setCurrentIndex} />
