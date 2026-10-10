@@ -1,4 +1,4 @@
-function createAuthMiddleware(getSupabase) {
+function createAuthMiddleware(getSupabase, verifyDemoSession = require('../services/demoSessions').verifyDemoSession) {
   async function authenticate(req, res, next) {
     const authorization = req.get('authorization') || '';
     const match = authorization.match(/^Bearer\s+(\S+)$/i);
@@ -8,6 +8,15 @@ function createAuthMiddleware(getSupabase) {
     }
 
     try {
+      if (match[1].startsWith('demo.')) {
+        const demoUser = verifyDemoSession(match[1]);
+        if (!demoUser) {
+          return res.status(401).json({ error: 'A valid access token is required.' });
+        }
+        req.auth = { ...demoUser, isDemo: true };
+        return next();
+      }
+
       const { data, error } = await getSupabase().auth.getUser(match[1]);
       if (error || !data.user) {
         return res.status(401).json({ error: 'A valid access token is required.' });

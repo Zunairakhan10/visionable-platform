@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { after, before, test } = require('node:test');
 const express = require('express');
 const { createAuthMiddleware } = require('../src/middleware/auth');
+const { issueDemoSession } = require('../src/services/demoSessions');
 
 const userByToken = {
   'candidate-token': {
@@ -40,6 +41,12 @@ app.get('/candidate', authenticate, requireRole('candidate'), (req, res) => {
   res.json({ role: req.auth.role });
 });
 app.get('/examiner', authenticate, requireRole('examiner'), (req, res) => {
+  res.json({ role: req.auth.role });
+});
+app.get('/demo-candidate', authenticate, requireRole('candidate'), (req, res) => {
+  res.json({ role: req.auth.role, candidateId: req.auth.candidateId });
+});
+app.get('/demo-examiner', authenticate, requireRole('examiner'), (req, res) => {
   res.json({ role: req.auth.role });
 });
 
@@ -92,4 +99,34 @@ test('only a server-provisioned examiner role grants examiner access', async () 
     headers: { authorization: 'Bearer examiner-token' },
   });
   assert.equal(candidateRoute.status, 403);
+});
+
+test('signed demo sessions cannot change their role or access another role API', async () => {
+  const candidateToken = issueDemoSession({
+    id: 'demo-candidate',
+    email: 'candidate@example.test',
+    role: 'candidate',
+    candidateId: 'VA-1048',
+  });
+  const candidateRoute = await fetch(`${baseUrl}/demo-candidate`, {
+    headers: { authorization: `Bearer ${candidateToken}` },
+  });
+  assert.equal(candidateRoute.status, 200);
+  assert.deepEqual(await candidateRoute.json(), { role: 'candidate', candidateId: 'VA-1048' });
+
+  assert.equal((await fetch(`${baseUrl}/demo-examiner`, {
+    headers: { authorization: `Bearer ${candidateToken}` },
+  })).status, 403);
+  assert.equal((await fetch(`${baseUrl}/demo-examiner`, {
+    headers: { authorization: `Bearer ${candidateToken.slice(0, -1)}x` },
+  })).status, 401);
+
+  const examinerToken = issueDemoSession({
+    id: 'demo-examiner',
+    email: 'examiner@example.test',
+    role: 'examiner',
+  });
+  assert.equal((await fetch(`${baseUrl}/demo-examiner`, {
+    headers: { authorization: `Bearer ${examinerToken}` },
+  })).status, 200);
 });

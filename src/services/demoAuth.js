@@ -1,9 +1,9 @@
 const ACCOUNTS_STORAGE_KEY = 'visionable:demo-accounts:v1'
 const SESSION_STORAGE_KEY = 'visionable:demo-session:v1'
 const STORAGE_VERSION = 1
+const SESSION_VERSION = 2
 const PASSWORD_ITERATIONS = 210_000
-const EXAMINER_EMAIL = 'examiner.demo@example.com'
-const EXAMINER_PASSWORD = 'VisionAbleDemo@123'
+const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || '/api').replace(/\/+$/, '')
 
 function normalizeEmail(email) {
   if (typeof email !== 'string') {
@@ -18,12 +18,12 @@ function normalizeEmail(email) {
 }
 
 function validatePassword(password) {
-  if (typeof password !== 'string' || password.length < 8) {
-    throw new Error('Your password must be at least 8 characters long.')
+  if (typeof password !== 'string' || password.length < 8 || password.length > 1024) {
+    throw new Error('Your password must be between 8 and 1024 characters long.')
   }
 }
 
-function readAccounts() {
+function readLegacyAccounts() {
   let storedAccounts
   try {
     storedAccounts = window.localStorage.getItem(ACCOUNTS_STORAGE_KEY)
@@ -74,10 +74,6 @@ function writeAccounts(accounts) {
   }
 }
 
-function encodeBase64(bytes) {
-  return btoa(String.fromCharCode(...bytes))
-}
-
 function decodeBase64(value) {
   const binary = atob(value)
   return Uint8Array.from(binary, (character) => character.charCodeAt(0))
@@ -104,19 +100,6 @@ async function hashPassword(password, salt) {
   return new Uint8Array(bits)
 }
 
-async function createPasswordHash(password) {
-  if (!globalThis.crypto?.subtle || !globalThis.crypto?.getRandomValues) {
-    throw new Error('Secure password storage is unavailable. Open this prototype on localhost or in a secure browser context.')
-  }
-
-  const salt = globalThis.crypto.getRandomValues(new Uint8Array(16))
-  const passwordHash = await hashPassword(password, salt)
-  return {
-    salt: encodeBase64(salt),
-    passwordHash: encodeBase64(passwordHash),
-  }
-}
-
 async function passwordMatches(password, account) {
   let salt
   let expectedHash
@@ -140,70 +123,115 @@ async function passwordMatches(password, account) {
   return difference === 0
 }
 
-function saveSession(email, role) {
-  const session = {
-    version: STORAGE_VERSION,
-    email,
-    role,
-    issuedAt: new Date().toISOString(),
+function saveSession(profile, accessToken) {
+  const storedSession = {
+    version: SESSION_VERSION,
+    email: profile.email,
+    role: profile.role,
+    ...(profile.candidateId ? { candidateId: profile.candidateId } : {}),
+    accessToken,
   }
   try {
-    window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session))
+    window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(storedSession))
   } catch {
     throw new Error('Your sign-in could not be saved in this browser. Check its available storage and try again.')
   }
-  return { email, role }
+  return {
+    email: profile.email,
+    role: profile.role,
+    ...(profile.candidateId ? { candidateId: profile.candidateId } : {}),
+    accessToken,
+  }
+}
+
+async function requestDemoAuth(action, email, password) {
+  let response
+  try {
+    response = await fetch(`${API_BASE_URL}/auth/demo/${action}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+  } catch (error) {
+    throw new Error('The demo authentication API could not be reached. Check your connection and try again.', { cause: error })
+  }
+
+  let result
+  try {
+    result = await response.json()
+  } catch (error) {
+    throw new Error('The demo authentication server returned an invalid response.', { cause: error })
+  }
+  if (!response.ok) {
+    const requestError = new Error(result?.error || 'Authentication could not be completed.')
+    requestError.status = response.status
+    throw requestError
+  }
+  if (
+    !result?.session
+    || typeof result.session.email !== 'string'
+    || !['candidate', 'examiner'].includes(result.session.role)
+    || typeof result.accessToken !== 'string'
+    || (result.session.role === 'candidate' && typeof result.session.candidateId !== 'string')
+  ) {
+    throw new Error('The demo authentication server returned an incomplete session.')
+  }
+  return result
+}
+
+function storeSession(result) {
+  return saveSession(result.session, result.accessToken)
 }
 
 export async function registerCandidate(email, password) {
   const normalizedEmail = normalizeEmail(email)
   validatePassword(password)
-  const accounts = readAccounts()
-
-  if (normalizedEmail === EXAMINER_EMAIL) {
-    throw new Error('This email is reserved for the separate examiner demo sign-in.')
-  }
-  if (accounts.some((account) => account.email === normalizedEmail)) {
-    throw new Error('An account with this email already exists. Sign in instead.')
-  }
-
-  const passwordData = await createPasswordHash(password)
-  const latestAccounts = readAccounts()
-  if (latestAccounts.some((account) => account.email === normalizedEmail)) {
-    throw new Error('An account with this email already exists. Sign in instead.')
-  }
-
-  writeAccounts([
-    ...latestAccounts,
-    {
-      version: STORAGE_VERSION,
-      email: normalizedEmail,
-      ...passwordData,
-    },
-  ])
-  return saveSession(normalizedEmail, 'candidate')
+  return storeSession(await requestDemoAuth('register', normalizedEmail, password))
 }
 
 export async function loginCandidate(email, password) {
   const normalizedEmail = normalizeEmail(email)
   validatePassword(password)
-  if (normalizedEmail === EXAMINER_EMAIL) {
+
+  let result
+  try {
+    result = await requestDemoAuth('login', normalizedEmail, password)
+  } catch (loginError) {
+    if (loginError.status !== 401) throw loginError
+
+    const legacyAccount = readLegacyAccounts().find((storedAccount) => storedAccount.email === normalizedEmail)
+    if (!legacyAccount || !await passwordMatches(password, legacyAccount)) throw loginError
+
+    try {
+      const migratedSession = await requestDemoAuth('register', normalizedEmail, password)
+      const accounts = readLegacyAccounts().filter((storedAccount) => storedAccount.email !== normalizedEmail)
+      writeAccounts(accounts)
+      return storeSession(migratedSession)
+    } catch (migrationError) {
+      if (migrationError.status === 409) throw loginError
+      throw migrationError
+    }
+  }
+
+  if (result.session.role !== 'candidate') {
     throw new Error('Use the separate examiner sign-in option for this account.')
   }
-
-  const account = readAccounts().find((storedAccount) => storedAccount.email === normalizedEmail)
-  if (!account || !await passwordMatches(password, account)) {
-    throw new Error('The email or password is incorrect.')
-  }
-  return saveSession(account.email, 'candidate')
+  return storeSession(result)
 }
 
-export function loginExaminer(email, password) {
+export async function loginExaminer(email, password) {
   const normalizedEmail = normalizeEmail(email)
-  if (normalizedEmail !== EXAMINER_EMAIL || password !== EXAMINER_PASSWORD) {
-    throw new Error('The examiner email or password is incorrect.')
+  validatePassword(password)
+  try {
+    const result = await requestDemoAuth('login', normalizedEmail, password)
+    if (result.session.role !== 'examiner') {
+      throw new Error('The examiner email or password is incorrect.')
+    }
+    return storeSession(result)
+  } catch (error) {
+    if (error.status === 401) throw new Error('The examiner email or password is incorrect.', { cause: error })
+    throw error
   }
-  return saveSession(EXAMINER_EMAIL, 'examiner')
 }
 
 export function getDemoSession() {
@@ -224,29 +252,34 @@ export function getDemoSession() {
     return null
   }
 
-  const validSession = session?.version === STORAGE_VERSION
+  const validSession = session?.version === SESSION_VERSION
     && typeof session.email === 'string'
     && (session.role === 'candidate' || session.role === 'examiner')
-    && typeof session.issuedAt === 'string'
-    && !Number.isNaN(Date.parse(session.issuedAt))
+    && typeof session.accessToken === 'string'
   if (!validSession) {
     clearStoredSession()
     return null
   }
 
   if (session.role === 'examiner') {
-    if (session.email !== EXAMINER_EMAIL) {
-      clearStoredSession()
-      return null
+    return {
+      email: session.email,
+      role: session.role,
+      ...(session.candidateId ? { candidateId: session.candidateId } : {}),
+      accessToken: session.accessToken,
     }
-    return { email: session.email, role: session.role }
   }
 
-  if (!readAccounts().some((account) => account.email === session.email)) {
+  if (typeof session.candidateId !== 'string') {
     clearStoredSession()
     return null
   }
-  return { email: session.email, role: session.role }
+  return {
+    email: session.email,
+    role: session.role,
+    candidateId: session.candidateId,
+    accessToken: session.accessToken,
+  }
 }
 
 function clearStoredSession() {

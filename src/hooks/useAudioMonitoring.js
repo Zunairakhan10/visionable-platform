@@ -103,18 +103,16 @@ export function useAudioMonitoring(isActive, onFeedback) {
 
               if (!eventRecorded && now - activityStartedAt >= SUSTAINED_ACTIVITY_MS) {
                 eventRecorded = true
-                try {
-                  recordMonitoringEvent({
-                    candidateId: getCandidateId(),
-                    type: 'VOICE_ACTIVITY_DETECTED',
-                    timestamp: new Date().toISOString(),
-                    severity: 'warning',
-                    status: 'needs_review',
-                  })
-                } catch (error) {
+                recordMonitoringEvent({
+                  candidateId: getCandidateId(),
+                  type: 'VOICE_ACTIVITY_DETECTED',
+                  timestamp: new Date().toISOString(),
+                  severity: 'warning',
+                  status: 'needs_review',
+                }).catch((error) => {
                   onFeedback('Audio activity was detected, but the monitoring event could not be saved.', 'error')
                   console.error('Audio monitoring event could not be recorded.', error)
-                }
+                })
               }
             } else if (lastActivityAt !== null && now - lastActivityAt >= QUIET_PERIOD_MS) {
               activityStartedAt = null

@@ -1,17 +1,12 @@
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const serverEnvPath = path.join(root, 'server/.env')
-const backendConfigured = process.env.VISIONABLE_DEMO_ONLY !== '1' && ((
-  process.env.SUPABASE_URL
-  && process.env.SUPABASE_SERVICE_ROLE_KEY
-) || existsSync(serverEnvPath))
+const startBackend = process.env.VISIONABLE_DEMO_ONLY !== '1'
 const processSpecs = [
-  ...(backendConfigured ? [{
+  ...(startBackend ? [{
     name: 'backend',
     args: [path.join(root, 'server/src/server.js')],
   }] : []),
@@ -21,8 +16,8 @@ const processSpecs = [
   },
 ]
 
-if (!backendConfigured) {
-  console.log('Supabase server configuration not found; starting the frontend only.')
+if (!startBackend) {
+  console.log('VISIONABLE_DEMO_ONLY=1; starting the frontend only.')
 }
 
 const processes = processSpecs.map(({ name, args }) => {

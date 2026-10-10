@@ -15,18 +15,66 @@ The React Compiler is not enabled on this template because of its impact on dev 
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
 
+## Vercel deployment
+
+The frontend is the Vite static build (`dist/`). The same Vercel project serves the Express API through the Node.js function at [`api/[...path].js`](./api/[...path].js), so the default `VITE_API_BASE_URL=/api` keeps browser requests same-origin. `vercel.json` sets the frontend install/build/output commands and separately installs the backend's locked dependencies. Use Node.js 22.x.
+
+### Vercel project settings
+
+Import the repository and set:
+
+- **Root Directory:** repository root (`.`)
+- **Framework Preset:** Vite
+- **Install Command:** `npm ci && npm ci --prefix server`
+- **Build Command:** `npm run build`
+- **Output Directory:** `dist`
+- **Node.js Version:** 22.x
+- **Functions region:** choose the region nearest the primary users and Blob store
+
+These values are also in [`vercel.json`](./vercel.json). Leave `VITE_API_BASE_URL` at `/api` for this single-project setup. If the frontend and API are hosted on different origins, build with the API's HTTPS base URL and set the backend's `CORS_ALLOWED_ORIGINS` to the exact frontend origins (comma-separated).
+
+### Environment variables
+
+Add variables in **Project → Settings → Environment Variables**, choosing the applicable Production, Preview, and Development targets. Do not add secret values to source control or any `VITE_` variable.
+
+Required for the demo flow:
+
+- `DEMO_EXAMINER_EMAIL`: dedicated examiner demo account email
+- `DEMO_EXAMINER_PASSWORD`: strong examiner demo password
+- `DEMO_SESSION_SECRET`: random secret of at least 32 characters; keep stable across deployments so signed sessions remain verifiable
+- `VITE_API_BASE_URL`: `/api` for this deployment (the frontend also defaults to this value)
+
+Required durable storage:
+
+- Create a **Private** Vercel Blob store under **Storage → Create Storage → Blob**, connect it to this Vercel project, and enable the target environments. The SDK uses the connected store's Vercel OIDC credentials (`BLOB_STORE_ID` and `VERCEL_OIDC_TOKEN`) automatically. If connecting the store is not available, configure its server-only `BLOB_READ_WRITE_TOKEN` instead; never prefix it with `VITE_`.
+
+Optional:
+
+- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`: public Supabase project URL and anon/publishable key, only when frontend Supabase Auth is used
+- `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`: server-only Supabase project URL and service-role key, required for API validation of Supabase access tokens
+- `CORS_ALLOWED_ORIGINS`: comma-separated exact frontend origins when the frontend is on another host; same-origin requests do not require a production entry
+
+For Supabase role lookup, run [`server/supabase/auth-roles.sql`](./server/supabase/auth-roles.sql) in the Supabase SQL editor and provision examiner rows in `public.user_roles` from a trusted server/admin process. Never grant examiner role from browser-controlled metadata. The API's Supabase authentication path is retained; monitoring events use Blob storage in this Vercel setup.
+
+### Storage model and limits
+
+Vercel Functions do not use the local JSON files. In Vercel runtime, demo accounts and monitoring events use a **private, record-per-object** Blob layout: one account object keyed by a SHA-256 digest of normalized email, and one event object keyed by event UUID. Reviews update just that event object with an ETag precondition; filtering and listing never delete records. Local development and tests retain the existing serialized JSON-file stores under ignored `server/data/`.
+
+This is durable demo storage, not a transactional database: listing reads each record and is intended for small demo volumes. Blob object creation prevents duplicate account/event keys; candidate identifiers are human-readable demo IDs and are not a production identity system. Set retention/cleanup policy and use a database with transactional indexing before real examinations or sensitive production workloads. Existing local JSON records are not automatically migrated to Blob.
+
+### Manual verification after configuration
+
+Before opening access to users, deploy a Preview build and verify `/api/health`, candidate registration/sign-in, examiner sign-in and review, and a full exam event round trip. Check the Blob store is **Private**, all function environments are connected, the secret variables are present in each environment, and the browser bundle contains no server-only values.
+
 ## Local demo authentication
 
-Run `npm run dev` to start the frontend. The backend starts as well when `server/.env` (or both server Supabase environment variables) is configured; without it, the frontend still starts and monitoring data stays local. Set `VISIONABLE_DEMO_ONLY=1` to explicitly run just the frontend even if server configuration is present. The browser demo sign-in does not require `.env.local` or Supabase credentials. Candidate accounts are stored in this browser's `localStorage`; each password is stored as a salted PBKDF2-SHA-256 hash, while the current role/session is kept in a separate storage entry. Clearing this site's storage removes the demo accounts and session. There is no password reset for locally stored demo accounts.
+Run `npm run dev` to start the Express backend and Vite frontend. Set `VISIONABLE_DEMO_ONLY=1` to run only the frontend. Local demo candidate accounts and monitoring events use backend-managed JSON files under the ignored `server/data/` directory; on Vercel, private Blob records are used instead. The browser stores only the current signed demo session. Existing browser-only candidate accounts are migrated to the backend the first time the candidate signs in successfully. There is no password reset for demo accounts.
 
-Candidate registration always creates a candidate account. Examiner sign-in is separate and uses these shared demo credentials:
+Candidate registration always creates a candidate account. Local examiner credentials are provided by the backend's local demo defaults; use environment-specific credentials for any deployed instance.
 
-- Email: `examiner.demo@example.com`
-- Password: `VisionAbleDemo@123`
+Demo passwords are hashed on the backend, and the backend issues signed, expiring role tokens. Examiner API endpoints verify the signed role (or an existing Supabase token and server-provisioned role); candidate registration cannot create examiner access. Vercel requires explicit server-side examiner credentials and a stable signing secret. Demo authentication is for demonstration only, not production identity management.
 
-This is frontend-only demonstration authentication. Locally stored accounts, sessions, and browser-side role checks can be changed by the user and must not be used to protect real exams or sensitive data. The Supabase backend integration, SQL migrations, and auth helpers remain available for a future production authentication flow; backend API sync still requires its server-side Supabase configuration.
-
-Run `npm test` for frontend service tests, `npm run lint` for linting, `npm run build` for a production build, and `npm test --prefix server` for the backend authorization tests.
+Run `npm test` for frontend service tests, `npm run lint` for linting, `npm run build` for a production build, and `npm test --prefix server` for backend tests.
 
 ## Voice and keyboard accessibility
 
@@ -40,24 +88,10 @@ Exam commands use short phrases such as “Next question” and “Select option
 
 Speech recognition and synthesis use browser capabilities; recognition support, audio handling, network requirements, and available voices vary by browser. No paid speech API or additional speech service is configured. If microphone or speech support is unavailable, keyboard, visible text, and screen-reader access remain available.
 
-## Supabase-backed monitoring events
+## Demo monitoring event storage
 
-1. Copy `.env.example` to `.env.local` and set the Supabase project URL and public anon/publishable key. These frontend values are public; never put the service-role key in a `VITE_` variable.
-2. Keep `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in the ignored `server/.env`.
-3. Run `server/supabase/schema.sql` and `server/supabase/auth-roles.sql` in the Supabase SQL Editor.
-4. In Supabase Auth URL Configuration, set the local site URL (for example `http://localhost:5173`) and allow that URL as a redirect for email confirmation and password recovery. Add the deployed site URL in deployment.
-5. Public account creation grants candidate access only. To provision an examiner, create/invite the user through an authorized administrative workflow, then run this SQL as a Supabase project administrator, replacing the email:
+Candidate exam events are sent to `POST /api/monitoring-events`; the examiner dashboard lists events from `GET /api/monitoring-events` and saves notes/statuses through `PATCH /api/monitoring-events/:id/review`. All three endpoints require a valid candidate or examiner role. Events carry an exam-session UUID and the dashboard defaults to the latest session; choosing an earlier session only filters the displayed data and never deletes server records. For demo sessions, the backend verifies its own signed tokens; existing Supabase access-token authentication and server-assigned roles remain supported.
 
-   ```sql
-   insert into public.user_roles (user_id, role)
-   select id, 'examiner'
-   from auth.users
-   where email = 'examiner@example.com'
-   on conflict (user_id) do update set role = excluded.role;
-   ```
+The backend serializes local JSON-file updates and replaces files atomically. Missing files start empty; malformed or unsupported files are reported and are not overwritten. Event records are stored in `server/data/monitoring-events.json`; backend demo accounts are stored separately in `server/data/demo-users.json`. On Vercel these stores are private Blob objects and the dashboard refreshes shared events periodically; the browser does not store monitoring events.
 
-   The browser cannot read or change `user_roles`. The backend checks the Supabase access token and resolves the role from this table for protected API requests.
-
-The prototype's local demo sign-in does not create a Supabase Auth session. Events recorded in that mode remain in this browser and are labeled **Local demo only**. The monitoring API is used only when a real Supabase Auth session is available; the server validates its access token and role for every protected operation. A public frontend key alone does not authorize monitoring access. Shared event records are fetched again from the backend after opening the dashboard and are not cached in local storage.
-
-The Supabase Auth login flow is not part of the local demo authentication. Until that flow is connected, users must have a valid Supabase Auth session (and an examiner role provisioned in `user_roles`) for cross-browser dashboard access. Frontend demo role checks are prototype navigation only and are not production authorization.
+**Both local JSON and Vercel Blob modes are demo storage, not production-grade examination records.** Local files are intended for one backend process. Blob records are private and durable but lack the transactional querying, retention, and operational controls needed for real examinations or sensitive production data. Supabase Auth credentials and existing Supabase token/role validation remain separate; Supabase is not used as the monitoring-event database.

@@ -70,7 +70,7 @@ function EventTimeline({ events }) {
                         ? 'Not saved to server'
                         : 'Local demo only'}
                   </span>
-                ) : <span className="event-sync-status">Saved to Supabase</span>}
+                ) : <span className="event-sync-status">Saved to demo server</span>}
               </span>
             </button>
           </li>

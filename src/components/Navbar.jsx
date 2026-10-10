@@ -1,17 +1,17 @@
 import { useState } from 'react'
 
-function Navbar({ onStartExam, onOpenDashboard }) {
+function Navbar({ onOpenLogin, onOpenSignup }) {
   const [open, setOpen] = useState(false)
   const closeMenu = () => setOpen(false)
 
-  const startExam = () => {
+  const openLogin = () => {
     closeMenu()
-    onStartExam()
+    onOpenLogin()
   }
 
-  const openDashboard = () => {
+  const openSignup = () => {
     closeMenu()
-    onOpenDashboard()
+    onOpenSignup()
   }
 
   return (
@@ -21,8 +21,8 @@ function Navbar({ onStartExam, onOpenDashboard }) {
         <button className="menu-toggle" type="button" aria-expanded={open} aria-controls="primary-nav" onClick={() => setOpen((value) => !value)}><span className="sr-only">{open ? 'Close menu' : 'Open menu'}</span><span aria-hidden="true">{open ? '✕' : '☰'}</span></button>
         <nav id="primary-nav" className={open ? 'primary-nav is-open' : 'primary-nav'} aria-label="Primary">
           <a href="#about" onClick={closeMenu}>About</a><a href="#features" onClick={closeMenu}>Features</a><a href="#how-it-works" onClick={closeMenu}>How It Works</a>
-          <button className="nav-dashboard" type="button" onClick={openDashboard}>Examiner dashboard</button>
-          <button className="nav-cta" type="button" onClick={startExam}>Try exam prototype <span aria-hidden="true">→</span></button>
+          <button className="nav-login" type="button" onClick={openLogin}>Log in</button>
+          <button className="nav-cta" type="button" onClick={openSignup}>Sign up</button>
         </nav>
       </div>
     </header>

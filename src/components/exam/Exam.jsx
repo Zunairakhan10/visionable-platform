@@ -90,6 +90,15 @@ function Exam({ onExit, onLogout, voiceControl, registerVoiceCommandHandler }) {
     showFeedback('Response cleared.', 'info')
   }
 
+  const readInstructions = useCallback(() => {
+    const instructions = 'Examination instructions. There are eight questions and thirty minutes. Use the question palette or previous and next controls to navigate. Answers are saved locally when selected. Use Mark for review to revisit a question. Camera presence monitoring is optional; declining camera access will not prevent you from continuing. All controls are keyboard accessible. Activate Begin examination when you are ready.'
+    if (speak(instructions)) {
+      setFeedback({ message: 'Reading the examination instructions aloud.', tone: 'info' })
+    } else {
+      setFeedback({ message: 'Spoken guidance is unavailable in this browser. Use the on-screen instructions.', tone: 'error' })
+    }
+  }, [speak])
+
   const performVoiceCommand = useCallback((command) => {
     setPendingCommands([])
     setRecognizedAction(command.label)
@@ -102,6 +111,9 @@ function Exam({ onExit, onLogout, voiceControl, registerVoiceCommandHandler }) {
         break
       case 'read':
         readCurrentQuestion()
+        break
+      case 'read-instructions':
+        readInstructions()
         break
       case 'read-options': {
         const optionText = currentQuestion.options
@@ -164,7 +176,7 @@ function Exam({ onExit, onLogout, voiceControl, registerVoiceCommandHandler }) {
         tone: 'info',
       })
     }
-  }, [answers, currentIndex, currentQuestion, goNext, goPrevious, openSubmitConfirmation, readCurrentQuestion, selectAnswer, setFeedback, showFeedback, speak, voiceControl])
+  }, [answers, currentIndex, currentQuestion, goNext, goPrevious, openSubmitConfirmation, readCurrentQuestion, readInstructions, selectAnswer, setFeedback, showFeedback, speak, voiceControl])
 
   const handleVoiceCommand = useCallback((transcript, alternatives = []) => {
     setRecognizedCommand(transcript)
@@ -200,10 +212,6 @@ function Exam({ onExit, onLogout, voiceControl, registerVoiceCommandHandler }) {
   }, [performVoiceCommand, showFeedback])
 
   useLayoutEffect(() => registerVoiceCommandHandler('exam', handleVoiceCommand), [handleVoiceCommand, registerVoiceCommandHandler])
-  const readInstructions = () => {
-    speak('Examination instructions. There are eight questions and thirty minutes. Use the question palette or previous and next controls to navigate. Answers are saved locally when selected. Use Mark for review to revisit a question. Camera presence monitoring is optional; declining camera access will not prevent you from continuing. All controls are keyboard accessible. Activate Begin examination when you are ready.')
-  }
-
   const examProgress = useMemo(() => Math.round(((currentIndex + 1) / questions.length) * 100), [currentIndex])
   const examClassName = `exam-app active-exam ${largeText ? 'large-text' : ''} ${highContrast ? 'high-contrast' : ''}`
 

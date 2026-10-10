@@ -4,6 +4,7 @@ const COMMANDS = [
   { key: 'next', label: 'Next question', pattern: /^(?:next|next question|go to next question)$/ },
   { key: 'previous', label: 'Previous question', pattern: /^(?:previous|previous question|go back|go to previous question)$/ },
   { key: 'read', label: 'Read question and options aloud', pattern: /^(?:read|repeat)(?: the)? question(?: aloud)?$/ },
+  { key: 'read-instructions', label: 'Read examination instructions aloud', pattern: /^(?:read|repeat)(?: the)? instructions(?: aloud)?$/ },
   { key: 'read-options', label: 'Read available options', pattern: /^(?:read|repeat)(?: the)? (?:available )?options(?: aloud)?$/ },
   { key: 'read-answer', label: 'Read selected answer', pattern: /^(?:read|repeat)(?:(?: my| the selected| selected))? answer(?: aloud)?$/ },
   { key: 'review-unanswered', label: 'Review unanswered questions', pattern: /^(?:review|go to|show)(?: the)? unanswered questions?$/ },
