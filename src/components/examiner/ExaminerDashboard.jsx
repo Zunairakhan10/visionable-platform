@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react'
-import { DEFAULT_CANDIDATE_ID, getMonitoringEvents, subscribeToMonitoringEvents } from '../../services/monitoringEventStore'
+import {
+  DEFAULT_CANDIDATE_ID,
+  getMonitoringEvents,
+  getMonitoringStorageMode,
+  getMonitoringSyncError,
+  refreshMonitoringEvents,
+  retryUnsyncedMonitoringEvents,
+  subscribeToMonitoringEvents,
+} from '../../services/monitoringEventStore'
 import CandidateTable from './CandidateTable'
 import EventTimeline from './EventTimeline'
 import './ExaminerDashboard.css'
@@ -11,15 +19,39 @@ const demoCandidates = [
   { id: 'VA-1064', exam: 'General Aptitude & Awareness', progress: 31 },
 ]
 
-function ExaminerDashboard({ onExit }) {
+function ExaminerDashboard({ onExit, onLogout }) {
   const [events, setEvents] = useState(() => getMonitoringEvents())
+  const [storageMode, setStorageMode] = useState(() => getMonitoringStorageMode())
+  const [syncError, setSyncError] = useState(() => getMonitoringSyncError())
+  const [retrying, setRetrying] = useState(false)
 
   useEffect(() => {
-    return subscribeToMonitoringEvents(setEvents)
+    const unsubscribe = subscribeToMonitoringEvents((nextEvents, error, nextStorageMode) => {
+      setEvents(nextEvents)
+      setSyncError(error)
+      setStorageMode(nextStorageMode)
+    })
+
+    refreshMonitoringEvents().catch(() => {})
+    return unsubscribe
   }, [])
 
   const needsReview = events.filter((event) => event.status === 'needs_review').length
+  const unsyncedCount = events.filter((event) => (
+    !event._id && ['failed', 'pending'].includes(event.syncStatus)
+  )).length
+  const hasSharedEvents = events.some((event) => event.storageSource === 'supabase' || event.syncStatus === 'synced')
+  const hasLocalEvents = events.some((event) => event.storageSource !== 'supabase' && event.syncStatus !== 'synced')
   const candidateCount = demoCandidates.length
+
+  const retryUnsyncedEvents = async () => {
+    setRetrying(true)
+    try {
+      await retryUnsyncedMonitoringEvents()
+    } finally {
+      setRetrying(false)
+    }
+  }
 
   return (
     <div className="examiner-dashboard">
@@ -49,7 +81,8 @@ function ExaminerDashboard({ onExit }) {
       <main className="examiner-main" id="dashboard-main">
         <header className="examiner-topbar">
           <div className="examiner-breadcrumb"><span>Workspace</span><span aria-hidden="true">/</span><strong>Dashboard</strong></div>
-          <div className="secure-session"><span className="secure-session-dot" aria-hidden="true" /><span>Secure session</span><strong>ACTIVE</strong></div>
+          <div className="secure-session"><span className="secure-session-dot" aria-hidden="true" /><span>Demo session</span><strong>LOCAL</strong></div>
+          <button className="auth-logout-button" type="button" onClick={onLogout}>Sign out</button>
         </header>
 
         <div className="examiner-content">
@@ -59,7 +92,7 @@ function ExaminerDashboard({ onExit }) {
               <h1 id="examiner-heading">Examiner Dashboard</h1>
               <p>Monitor active sessions and review recorded events.</p>
             </div>
-            <div className="demo-data-label"><span aria-hidden="true">●</span>Local prototype data</div>
+            <div className="demo-data-label"><span aria-hidden="true">●</span>{storageMode === 'shared' ? 'Shared Supabase records' : 'Local demo data'}</div>
           </section>
 
           <section className="examiner-stats" aria-label="Candidate statistics">
@@ -93,8 +126,22 @@ function ExaminerDashboard({ onExit }) {
             <section className="examiner-panel events-panel" id="monitoring-events" aria-labelledby="events-heading">
               <div className="panel-heading">
                 <div><span className="panel-kicker">SESSION ACTIVITY</span><h2 id="events-heading">Recent monitoring events</h2></div>
-                <span className="event-live"><span className="active-pulse" />LOCAL</span>
+                <span className="event-live"><span className="active-pulse" />{storageMode === 'shared' ? 'SHARED' : 'LOCAL'}</span>
               </div>
+              {hasSharedEvents && hasLocalEvents && (
+                <p className="event-storage-note">Supabase records are shared. Local demo events remain on this device.</p>
+              )}
+              {syncError && <p className="event-review-error" role="alert">{syncError}</p>}
+              {unsyncedCount > 0 && (
+                <button
+                  className="retry-unsynced-button"
+                  type="button"
+                  onClick={retryUnsyncedEvents}
+                  disabled={retrying}
+                >
+                  {retrying ? 'Retrying event sync…' : `Retry saving ${unsyncedCount} unsaved event${unsyncedCount === 1 ? '' : 's'}`}
+                </button>
+              )}
               <EventTimeline events={events} />
             </section>
           </div>

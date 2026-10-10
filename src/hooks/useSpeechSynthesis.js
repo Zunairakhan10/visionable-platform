@@ -1,30 +1,67 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export function useSpeechSynthesis() {
   const supported = typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
+  const utteranceRef = useRef(null)
 
   const stop = useCallback(() => {
     if (!supported) return
+    utteranceRef.current = null
     window.speechSynthesis.cancel()
     setIsSpeaking(false)
+    setIsPaused(false)
+  }, [supported])
+
+  const pause = useCallback(() => {
+    if (!supported || !window.speechSynthesis.speaking) return
+    window.speechSynthesis.pause()
+    setIsPaused(true)
+  }, [supported])
+
+  const resume = useCallback(() => {
+    if (!supported || !window.speechSynthesis.paused) return
+    window.speechSynthesis.resume()
+    setIsPaused(false)
   }, [supported])
 
   const speak = useCallback((text) => {
     if (!supported) return false
+    utteranceRef.current = null
     window.speechSynthesis.cancel()
     const utterance = new SpeechSynthesisUtterance(text)
+    utteranceRef.current = utterance
     utterance.rate = 0.9
-    utterance.onstart = () => setIsSpeaking(true)
-    utterance.onend = () => setIsSpeaking(false)
-    utterance.onerror = () => setIsSpeaking(false)
+    utterance.onstart = () => {
+      if (utteranceRef.current !== utterance) return
+      setIsSpeaking(true)
+      setIsPaused(false)
+    }
+    utterance.onend = () => {
+      if (utteranceRef.current !== utterance) return
+      utteranceRef.current = null
+      setIsSpeaking(false)
+      setIsPaused(false)
+    }
+    utterance.onerror = () => {
+      if (utteranceRef.current !== utterance) return
+      utteranceRef.current = null
+      setIsSpeaking(false)
+      setIsPaused(false)
+    }
+    setIsSpeaking(false)
+    setIsPaused(false)
     window.speechSynthesis.speak(utterance)
     return true
   }, [supported])
 
   useEffect(() => () => {
-    if (supported) window.speechSynthesis.cancel()
+    if (supported) {
+      utteranceRef.current = null
+      window.speechSynthesis.cancel()
+    }
   }, [supported])
 
-  return { supported, isSpeaking, speak, stop }
+  return { supported, isSpeaking, isPaused, speak, pause, resume, stop }
 }
