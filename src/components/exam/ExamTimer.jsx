@@ -6,8 +6,12 @@ function formatTime(totalSeconds) {
   return `${minutes}:${seconds}`
 }
 
-function ExamTimer({ durationMinutes, isRunning, onTimeUp }) {
+function ExamTimer({ durationMinutes, isRunning, onTimeUp, onTimeChange }) {
   const [remainingSeconds, setRemainingSeconds] = useState(durationMinutes * 60)
+
+  useEffect(() => {
+    onTimeChange?.(remainingSeconds)
+  }, [onTimeChange, remainingSeconds])
 
   useEffect(() => {
     if (!isRunning || remainingSeconds <= 0) return undefined

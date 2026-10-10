@@ -12,7 +12,6 @@ import { parseExamVoiceCommand } from '../../services/examVoiceCommands'
 
 function Exam({ onExit, onLogout, voiceControl, registerVoiceCommandHandler }) {
   useExamMonitoring()
-
   const [examState, setExamState] = useState('instructions')
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState({})
@@ -40,7 +39,21 @@ function Exam({ onExit, onLogout, voiceControl, registerVoiceCommandHandler }) {
   useCameraMonitoring(examState === 'active', showFeedback)
   useAudioMonitoring(examState === 'active', showFeedback)
 
-  const readCurrentQuestion = useCallback(() => {
+  const speakMessage = useCallback((text, feedbackMessage = text, onEnd) => {
+    pauseVoiceRef.current()
+    const didSpeak = speak(text, { onEnd: () => {
+      resumeVoiceRef.current()
+      onEnd?.()
+    } })
+    if (didSpeak) showFeedback(feedbackMessage, 'info')
+    else {
+      resumeVoiceRef.current()
+      onEnd?.()
+      showFeedback('Text-to-speech is not supported in this browser.', 'error')
+    }
+  }, [showFeedback, speak])
+
+  const readCurrentQuestion = useCallback((onEnd) => {
     const optionText = currentQuestion.options.map((option, index) => `${String.fromCharCode(65 + index)}, ${option}`).join('. ')
     const didSpeak = speak(`Question ${currentIndex + 1}. ${currentQuestion.question}. Options: ${optionText}`)
     if (didSpeak) setFeedback({ message: 'Reading the current question and available options aloud.', tone: 'info' })
@@ -49,16 +62,20 @@ function Exam({ onExit, onLogout, voiceControl, registerVoiceCommandHandler }) {
 
   const selectAnswer = useCallback((answerIndex) => {
     setAnswers((current) => ({ ...current, [currentIndex]: answerIndex }))
-  }, [currentIndex])
+    const letter = String.fromCharCode(65 + answerIndex)
+    speakMessage(`Option ${letter} selected. Answer saved.`, `Option ${letter} selected. Answer saved.`)
+  }, [currentIndex, speakMessage])
 
   const toggleReview = useCallback(() => {
+    const willMark = !markedQuestions.has(currentIndex)
     setMarkedQuestions((current) => {
       const next = new Set(current)
       if (next.has(currentIndex)) next.delete(currentIndex)
       else next.add(currentIndex)
       return next
     })
-  }, [currentIndex])
+    speakMessage(willMark ? 'Question marked for review.' : 'Question removed from review.', willMark ? 'Marked for review.' : 'Removed from review.')
+  }, [currentIndex, markedQuestions, speakMessage])
 
   const goNext = useCallback(() => setCurrentIndex((current) => Math.min(questions.length - 1, current + 1)), [])
   const goPrevious = useCallback(() => setCurrentIndex((current) => Math.max(0, current - 1)), [])
@@ -81,14 +98,14 @@ function Exam({ onExit, onLogout, voiceControl, registerVoiceCommandHandler }) {
     speak('The examination time has ended. Your examination has been submitted.')
   }, [speak, stopReading])
 
-  const clearAnswer = () => {
+  const clearAnswer = useCallback(() => {
     setAnswers((current) => {
       const next = { ...current }
       delete next[currentIndex]
       return next
     })
-    showFeedback('Response cleared.', 'info')
-  }
+    speakMessage('Response cleared.', 'Response cleared.')
+  }, [currentIndex, speakMessage])
 
   const readInstructions = useCallback(() => {
     const instructions = 'Examination instructions. There are eight questions and thirty minutes. Use the question palette or previous and next controls to navigate. Answers are saved locally when selected. Use Mark for review to revisit a question. Camera presence monitoring is optional; declining camera access will not prevent you from continuing. All controls are keyboard accessible. Activate Begin examination when you are ready.'

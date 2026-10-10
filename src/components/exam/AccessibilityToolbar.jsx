@@ -54,5 +54,4 @@ function AccessibilityToolbar({ speechSupported, isSpeaking, isPaused, onReadQue
     </section>
   )
 }
-
 export default AccessibilityToolbar

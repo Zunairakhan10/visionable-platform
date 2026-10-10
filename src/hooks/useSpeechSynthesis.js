@@ -26,10 +26,25 @@ export function useSpeechSynthesis() {
     setIsPaused(false)
   }, [supported])
 
-  const speak = useCallback((text) => {
+  const pause = useCallback(() => {
+    if (!supported || !isSpeaking || isPaused) return
+    window.speechSynthesis.pause()
+    setIsPaused(true)
+  }, [isPaused, isSpeaking, supported])
+
+  const resume = useCallback(() => {
+    if (!supported || !isSpeaking || !isPaused) return
+    window.speechSynthesis.resume()
+    setIsPaused(false)
+  }, [isPaused, isSpeaking, supported])
+
+  const speak = useCallback((text, { onEnd } = {}) => {
     if (!supported) return false
     utteranceRef.current = null
     window.speechSynthesis.cancel()
+    setIsSpeaking(false)
+    setIsPaused(false)
+
     const utterance = new SpeechSynthesisUtterance(text)
     utteranceRef.current = utterance
     utterance.rate = 0.9
