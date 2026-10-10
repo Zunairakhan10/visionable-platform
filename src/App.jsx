@@ -14,7 +14,7 @@ import { getRoleShortcut, getRoleShortcutDestination, isTypingTarget } from './s
 import { useSpeechSynthesis } from './hooks/useSpeechSynthesis'
 import { useVoiceCommands } from './hooks/useVoiceCommands'
 import { parseLoginVoiceCommand } from './services/loginVoiceCommands'
-import { parseVoiceControlCommand } from './services/voiceControlCommands'
+import { parseSpeechGuidanceCommand, parseVoiceControlCommand } from './services/voiceControlCommands'
 import { createVoiceCommandRouter } from './services/voiceCommandRouter'
 import './App.css'
 
@@ -78,7 +78,7 @@ function LandingVoiceControl({ speech, onCandidateLogin, onExaminerLogin, onCand
     <section className="landing-voice-control" aria-labelledby="landing-voice-heading">
       <div>
         <h2 id="landing-voice-heading">Voice access</h2>
-        <p>Start voice control when ready, then say “Candidate login”, “Examiner login”, or “Create candidate account”. Microphone permission is requested only after you start.</p>
+        <p>Start voice control when ready, then say “Log in”, “Sign up”, “Examiner login”, or “Create candidate account”. Microphone permission is requested only after you start.</p>
       </div>
       <div className="landing-voice-actions">
         <button type="button" onClick={voiceControl.startListening} disabled={!voiceControl.supported || voiceControl.isActive}>{voiceControl.status === 'unavailable' ? 'Restart Voice Control' : 'Start Voice Control'}</button>
@@ -101,12 +101,12 @@ function LandingVoiceControl({ speech, onCandidateLogin, onExaminerLogin, onCand
       </p>
       {voiceControl.supported && <p className="landing-voice-help">Say “Pause voice control” to pause commands while keeping a minimal resume listener active; say “Resume voice control” to continue, or “Stop microphone” to fully stop recognition. Voice control remains active across VisionAble screens but not across reloads or external pages.</p>}
       {recognizedPhrase && <p className="landing-voice-recognized" aria-live="polite">Recognized: “{recognizedPhrase}”. {recognizedAction}</p>}
-      {message && status !== 'unavailable' && <p className="landing-voice-help" role="status" aria-live="polite">{message}</p>}
+      {message && voiceControl.status !== 'unavailable' && <p className="landing-voice-help" role="status" aria-live="polite">{message}</p>}
     </section>
   )
 }
 
-function AppVoiceControl({ voiceControl, message }) {
+function AppVoiceControl({ voiceControl, message, guidanceFeedback }) {
   const statusText = {
     ready: 'Voice control is off. Activate Start Voice Control when ready.',
     starting: 'Requesting microphone permission.',
@@ -128,6 +128,7 @@ function AppVoiceControl({ voiceControl, message }) {
       <div className="app-voice-dock-copy">
         <strong>Voice Control</strong>
         <p role="status" aria-live="polite" aria-atomic="true">{statusText}</p>
+        {guidanceFeedback && <p role="status" aria-live="polite" aria-atomic="true">{guidanceFeedback}</p>}
       </div>
       <div className="app-voice-dock-actions">
         {canStart && <button type="button" onClick={voiceControl.startListening} disabled={!voiceControl.supported}>{voiceControl.status === 'unavailable' ? 'Restart Voice Control' : 'Start Voice Control'}</button>}
@@ -152,6 +153,7 @@ function restoreDemoAuth() {
 function App() {
   const speech = useSpeechSynthesis()
   const [voiceMessage, setVoiceMessage] = useState('')
+  const [guidanceFeedback, setGuidanceFeedback] = useState('')
   const voiceControlRef = useRef(null)
   const currentViewRef = useRef('landing')
   const [voiceCommandRouter] = useState(() => createVoiceCommandRouter())
@@ -177,6 +179,33 @@ function App() {
   }, [voiceCommandRouter])
 
   const handleVoiceCommand = useCallback((transcript, alternatives) => {
+    setGuidanceFeedback('')
+    const guidanceCommand = parseSpeechGuidanceCommand(transcript)
+    if (guidanceCommand) {
+      if (!speech.supported) {
+        setGuidanceFeedback('Spoken guidance is unavailable in this browser. Use the on-screen controls or screen reader.')
+        return
+      }
+      if (guidanceCommand.key === 'pause-guidance') {
+        if (speech.isPaused) setGuidanceFeedback('Spoken guidance is already paused.')
+        else if (speech.isSpeaking) {
+          speech.pause()
+          setGuidanceFeedback('Spoken guidance paused. Say “Resume guidance” to continue.')
+        } else setGuidanceFeedback('No spoken guidance is currently playing.')
+      } else if (guidanceCommand.key === 'resume-guidance') {
+        if (speech.isPaused) {
+          speech.resume()
+          setGuidanceFeedback('Spoken guidance resumed.')
+        } else setGuidanceFeedback('There is no paused spoken guidance to resume.')
+      } else if (guidanceCommand.key === 'stop-speaking') {
+        speech.stop()
+        setGuidanceFeedback('Spoken guidance stopped.')
+      } else if (!voiceCommandRouter.dispatch(currentViewRef.current, transcript, alternatives)) {
+        setGuidanceFeedback('Instructions are unavailable on this screen. Use the on-screen guidance controls.')
+      }
+      return
+    }
+
     const controlCommand = parseVoiceControlCommand(transcript)
     if (controlCommand) {
       const control = voiceControlRef.current
@@ -380,13 +409,13 @@ function App() {
   } else if (view === 'exam') {
     activeScreen = <Exam onExit={returnToLanding} onLogout={logout} voiceControl={voiceControl} registerVoiceCommandHandler={registerVoiceCommandHandler} />
   } else if (view === 'examiner') {
-    activeScreen = <ExaminerDashboard onExit={returnToLanding} onLogout={logout} />
+    activeScreen = <ExaminerDashboard onExit={returnToLanding} onLogout={logout} speech={speech} registerVoiceCommandHandler={registerVoiceCommandHandler} />
   } else {
 
     activeScreen = (
       <div className="page" id="top">
       <a className="skip-link" href="#main">Skip to main content</a>
-      <Navbar onStartExam={openAuthSelection} onOpenDashboard={openAuthSelection} />
+      <Navbar onOpenLogin={openAuthSelection} onOpenSignup={requestCandidateSignup} />
       <main id="main">
         <LandingVoiceControl
           speech={speech}
@@ -476,7 +505,7 @@ function App() {
 
   return (
     <>
-      <AppVoiceControl voiceControl={voiceControl} message={voiceMessage} />
+      <AppVoiceControl voiceControl={voiceControl} message={voiceMessage} guidanceFeedback={guidanceFeedback} />
       {activeScreen}
     </>
   )

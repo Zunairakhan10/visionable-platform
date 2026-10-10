@@ -6,7 +6,7 @@ function AuthSelectionPage({ onCandidateLogin, onCandidateSignup, onExaminerLogi
   const [recognizedPhrase, setRecognizedPhrase] = useState('')
   const [recognizedAction, setRecognizedAction] = useState('')
   const { supported, isSpeaking, isPaused, speak, pause, resume, stop } = speech
-  const instructions = 'Choose how to continue. Say candidate login, examiner login, create candidate account or sign up, read instructions, or go back. Candidate account creation provides candidate access only. The examiner dashboard uses shared demo credentials and is not secure for real exams.'
+  const instructions = 'Choose how to continue. Say candidate login, examiner login, create candidate account or sign up, read instructions, or go back. Candidate account creation provides candidate access only. The examiner dashboard uses shared demo credentials and is for demonstration only.'
 
   useEffect(() => {
     speak(instructions)
@@ -63,7 +63,7 @@ function AuthSelectionPage({ onCandidateLogin, onCandidateSignup, onExaminerLogi
         <header className="auth-selection-heading">
           <span className="auth-selection-eyebrow">VISIONABLE ACCESS</span>
           <h1 id="auth-selection-title">Choose how to continue</h1>
-          <p>Choose a candidate or examiner demo sign-in. Demo role checks run only in this browser and are not secure for real exams.</p>
+          <p>Choose a candidate or examiner demo sign-in. Demo accounts are verified by the VisionAble server; do not use demo credentials for real exams.</p>
         </header>
         <section className="auth-selection-speech" aria-label="Spoken account selection guidance">
           <div className="auth-selection-speech-actions">
@@ -76,7 +76,7 @@ function AuthSelectionPage({ onCandidateLogin, onCandidateSignup, onExaminerLogi
         <section className="auth-selection-voice" aria-labelledby="auth-selection-voice-heading">
           <div>
             <h2 id="auth-selection-voice-heading">Voice Control</h2>
-            <p>Start explicitly to keep listening for account commands. Microphone permission is requested by your browser when you start.</p>
+            <p>Start explicitly to keep listening for account commands such as “Log in” or “Sign up”. Microphone permission is requested by your browser when you start.</p>
           </div>
           <div className="auth-selection-voice-actions">
             <button type="button" onClick={voiceControl.startListening} disabled={!voiceControl.supported || voiceControl.isActive}>{voiceControl.status === 'unavailable' ? 'Restart Voice Control' : 'Start Voice Control'}</button>
@@ -116,9 +116,9 @@ function AuthSelectionPage({ onCandidateLogin, onCandidateSignup, onExaminerLogi
           <section className="auth-selection-panel examiner-panel" aria-labelledby="examiner-access-heading">
             <span className="auth-selection-icon examiner-icon" aria-hidden="true">E</span>
             <h2 id="examiner-access-heading">Examiner</h2>
-            <p>Open the local examiner dashboard with the shared demo credentials.</p>
+            <p>Open the examiner dashboard with the shared demo credentials. Demo access is not for production.</p>
             <div className="auth-selection-actions">
-              <button className="auth-selection-primary" type="button" onClick={onExaminerLogin} onFocus={() => speak('Examiner login. Open the local examiner dashboard with shared demo credentials.')}>Examiner Login</button>
+              <button className="auth-selection-primary" type="button" onClick={onExaminerLogin} onFocus={() => speak('Examiner login. Open the examiner dashboard with shared demo credentials.')}>Examiner Login</button>
             </div>
             <p className="examiner-access-note">Frontend-only demo access can be manipulated and is not suitable for production or protecting real exams. Candidate signup cannot grant examiner access.</p>
           </section>

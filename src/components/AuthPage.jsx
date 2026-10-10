@@ -549,7 +549,7 @@ function AuthPage({ intent, mode, onModeChange, onSelectLoginIntent, onAuthentic
       const session = isSignUp
         ? await registerCandidate(email, password)
         : examinerIntent
-          ? loginExaminer(email, password)
+          ? await loginExaminer(email, password)
           : await loginCandidate(email, password)
       await onAuthenticated(session)
     } catch (submitError) {
@@ -574,9 +574,9 @@ function AuthPage({ intent, mode, onModeChange, onSelectLoginIntent, onAuthentic
         </h1>
         <p className="auth-description" id="auth-page-instructions">
           {isSignUp
-            ? 'Create a local demo account for the candidate examination. Candidate registration always receives candidate access.'
+            ? 'Create a demo account for the candidate examination. Candidate registration always receives candidate access.'
             : examinerIntent
-              ? 'Use the shared examiner demo credentials below. This frontend-only sign-in is not secure and must not protect real exams.'
+              ? 'Use the shared examiner demo credentials below. This demo sign-in is for demonstration only and must not protect real exams.'
               : 'Sign in or create an account to continue to the accessible examination.'}
         </p>
         {!examinerIntent && (
@@ -620,8 +620,7 @@ function AuthPage({ intent, mode, onModeChange, onSelectLoginIntent, onAuthentic
 
         {examinerIntent && (
           <p className="auth-hint">
-            Demo email: <strong>examiner.demo@example.com</strong><br />
-            Demo password: <strong>VisionAbleDemo@123</strong>
+            Sign in with the examiner credentials configured for this environment.
           </p>
         )}
         {(errorMessage || error) && <p ref={errorMessageRef} id="auth-error" className="auth-error" role="alert" aria-live="assertive" tabIndex="-1">{errorMessage || error}</p>}
@@ -759,7 +758,7 @@ function AuthPage({ intent, mode, onModeChange, onSelectLoginIntent, onAuthentic
             <p className="auth-hint" id="auth-password-help">
               {examinerIntent
                 ? 'Use a keyboard or trusted password manager. Voice control pauses when this field receives focus and may resume when focus leaves. The application does not provide password dictation or speak password values.'
-                : 'Passwords must be at least 8 characters. Candidate passwords are stored only as salted hashes in this browser. Voice control pauses when this field receives focus and may resume when focus leaves. The application does not provide password dictation. Operating-system input tools may have separate privacy behavior.'}
+                : 'Passwords must be at least 8 characters. Candidate passwords are stored on the demo server only as salted hashes. Voice control pauses when this field receives focus and may resume when focus leaves. The application does not provide password dictation. Operating-system input tools may have separate privacy behavior.'}
             </p>
           </div>
           {isSignUp && (

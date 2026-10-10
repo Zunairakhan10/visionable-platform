@@ -1,0 +1,6 @@
+{
+  "framework": "vite",
+  "installCommand": "npm ci && npm ci --prefix server",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist"
+}

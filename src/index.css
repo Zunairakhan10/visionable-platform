@@ -1,18 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bg: #060914;
-  --bg-soft: #0a1020;
-  --panel: rgba(13, 22, 42, 0.72);
-  --panel-solid: #0d162a;
-  --line: rgba(163, 181, 219, 0.15);
-  --line-bright: rgba(167, 217, 255, 0.28);
-  --ink: #f1f5ff;
-  --muted: #9ba9c4;
-  --muted-strong: #c5d0e5;
-  --cyan: #7be7f4;
-  --cyan-strong: #35cee2;
-  --purple: #a08bff;
+  --bg: #f5f3ee;
+  --bg-soft: #efeee9;
+  --panel: rgba(251, 250, 247, 0.94);
+  --panel-solid: #fbfaf7;
+  --line: rgba(113, 103, 83, 0.2);
+  --line-bright: rgba(120, 108, 82, 0.34);
+  --ink: #25282d;
+  --muted: #62666d;
+  --muted-strong: #484d55;
+  --cyan: #087384;
+  --cyan-strong: #086b77;
+  --purple: #7053af;
   --white: #fff;
   --sans: 'Manrope', system-ui, sans-serif;
   --mono: 'DM Mono', monospace;

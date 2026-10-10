@@ -67,6 +67,9 @@ export function useCameraMonitoring(isActive, onFeedback) {
         timestamp: new Date().toISOString(),
         severity: state === 'CANDIDATE_PRESENT' ? 'info' : 'warning',
         status: state === 'CANDIDATE_PRESENT' ? 'logged' : 'needs_review',
+      }).catch((error) => {
+        onFeedback('A camera presence event could not be saved to the demo server. You can continue the exam.', 'error')
+        console.error('Camera monitoring event could not be saved to the demo server.', error)
       })
     }
 

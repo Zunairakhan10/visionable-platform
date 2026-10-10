@@ -1,12 +1,16 @@
 import { useEffect } from 'react'
-import { getCandidateId, recordMonitoringEvent } from '../services/monitoringEventStore'
+import { getCandidateId, recordMonitoringEvent, startMonitoringSession } from '../services/monitoringEventStore'
 
 export function useExamMonitoring(onEvent) {
   useEffect(() => {
+    startMonitoringSession()
     const candidateId = getCandidateId()
     const reportEvent = (event) => {
-      const recordedEvent = recordMonitoringEvent(event)
-      onEvent?.(recordedEvent)
+      recordMonitoringEvent(event).then((recordedEvent) => {
+        onEvent?.(recordedEvent)
+      }).catch((error) => {
+        console.error('Exam monitoring event could not be saved to the demo server.', error)
+      })
     }
 
     const handleVisibilityChange = () => {
