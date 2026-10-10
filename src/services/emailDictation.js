@@ -1,5 +1,8 @@
+import { claimSpeechRecognitionSession } from './speechRecognitionSession.js'
+
 export const EMAIL_RECOGNITION_LANGUAGE = 'en-IN'
-export const EMAIL_RECOGNITION_FALLBACK_LANGUAGE = 'en-US'
+export const EMAIL_RECOGNITION_START_TIMEOUT_MS = 8000
+export const EMAIL_RECOGNITION_MIN_LISTEN_MS = 3500
 
 const SPOKEN_NUMBER_WORDS = {
   zero: '0',
@@ -16,7 +19,7 @@ const SPOKEN_NUMBER_WORDS = {
 }
 
 export function normalizeEmailTranscript(transcript) {
-  const trimmedTranscript = transcript.trim()
+  const trimmedTranscript = typeof transcript === 'string' ? transcript.trim() : ''
   const hasSpokenEmailTerms = /\b(?:at|dot|underscore|under\s+score|hyphen|dash|plus)\b/i.test(trimmedTranscript)
   if (!hasSpokenEmailTerms) return trimmedTranscript
 
@@ -32,6 +35,10 @@ export function normalizeEmailTranscript(transcript) {
     .replace(/\s+/g, '')
 }
 
+export function isValidEmailTranscript(transcript) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(transcript)
+}
+
 export function getEmailRecognitionErrorMessage(error) {
   switch (error) {
     case 'unsupported':
@@ -44,7 +51,9 @@ export function getEmailRecognitionErrorMessage(error) {
     case 'service-not-allowed':
       return 'Microphone or speech-recognition permission was denied. You can enter your email using the keyboard.'
     case 'audio-capture':
-      return 'No microphone is available. Connect a microphone or enter your email using the keyboard.'
+      return 'The microphone is unavailable or busy. Check that another app is not using it, then try again or enter your email using the keyboard.'
+    case 'microphone-busy':
+      return 'The microphone is already in use or unavailable. Close other microphone apps and try again, or enter your email using the keyboard.'
     case 'no-speech':
       return 'No speech was detected. Check your microphone, speak after listening starts, or enter your email using the keyboard.'
     case 'network':
@@ -54,7 +63,9 @@ export function getEmailRecognitionErrorMessage(error) {
     case 'aborted':
       return 'Voice input stopped.'
     case 'empty-transcript':
-      return 'No email words were returned by speech recognition. Try again or enter your email using the keyboard.'
+      return 'No speech was recognized. Try again and speak after listening starts, or enter your email using the keyboard.'
+    case 'voice-control-stop-failed':
+      return 'Voice control could not release the microphone. Stop it manually before dictating your email, or use the keyboard.'
     default:
       return 'Voice input could not be completed. Check microphone access and try again, or enter your email using the keyboard.'
   }
@@ -63,38 +74,51 @@ export function getEmailRecognitionErrorMessage(error) {
 export function configureEmailRecognition(recognition, handlers) {
   let receivedResult = false
   let receivedError = false
+  let startedAt = null
 
   recognition.lang = EMAIL_RECOGNITION_LANGUAGE
   recognition.continuous = false
   recognition.interimResults = false
   recognition.maxAlternatives = 3
   recognition.onstart = () => {
+    startedAt = Date.now()
     receivedResult = false
     receivedError = false
+    handlers.onDiagnostic?.({ event: 'start', state: 'listening' })
     handlers.onStart()
+  }
+  for (const eventName of ['onaudiostart', 'onsoundstart', 'onspeechstart', 'onaudioend', 'onsoundend', 'onspeechend']) {
+    recognition[eventName] = () => handlers.onDiagnostic?.({ event: eventName.slice(2), state: 'event' })
   }
   recognition.onresult = (event) => {
     const transcript = Array.from(event.results || [])
-      .map((result) => result?.[0]?.transcript || '')
+      .filter((result) => result?.isFinal !== false)
+      .map((result) => result?.[0]?.transcript?.trim() || '')
       .filter(Boolean)
       .join(' ')
       .trim()
 
-    if (!transcript) {
-      receivedError = true
-      handlers.onError('empty-transcript')
-      return
-    }
+    if (!transcript) return
 
     receivedResult = true
+    handlers.onDiagnostic?.({ event: 'result', state: 'result-received' })
+    handlers.onProcessing?.()
     handlers.onTranscript(transcript)
   }
   recognition.onerror = (event) => {
     receivedError = true
-    handlers.onError(event.error || 'unknown')
+    const error = event.error || 'unknown'
+    handlers.onDiagnostic?.({ event: 'error', error })
+    handlers.onError(error, { startedAt, elapsedMs: startedAt === null ? 0 : Date.now() - startedAt })
   }
   recognition.onend = () => {
-    handlers.onEnd({ receivedResult, receivedError })
+    const elapsedMs = startedAt === null ? 0 : Date.now() - startedAt
+    handlers.onDiagnostic?.({
+      event: 'end',
+      state: receivedResult ? 'result-received' : 'ended-without-result',
+      receivedResult,
+    })
+    handlers.onEnd({ receivedResult, receivedError, startedAt, elapsedMs })
   }
 
   return recognition
@@ -102,7 +126,15 @@ export function configureEmailRecognition(recognition, handlers) {
 
 export function startEmailRecognition(SpeechRecognition, handlers, onCreated = () => {}) {
   if (!SpeechRecognition) {
+    handlers.onDiagnostic?.({ event: 'unsupported', state: 'unavailable' })
     handlers.onError('unsupported')
+    return null
+  }
+
+  const releaseSession = claimSpeechRecognitionSession('email-dictation')
+  if (!releaseSession) {
+    handlers.onDiagnostic?.({ event: 'start-blocked', state: 'microphone-busy' })
+    handlers.onError('microphone-busy')
     return null
   }
 
@@ -110,25 +142,65 @@ export function startEmailRecognition(SpeechRecognition, handlers, onCreated = (
   try {
     recognition = new SpeechRecognition()
   } catch {
+    releaseSession()
+    handlers.onDiagnostic?.({ event: 'construction-failed', state: 'unavailable' })
     handlers.onError('construction-failed')
     return null
   }
 
   configureEmailRecognition(recognition, handlers)
+  recognition.onend = ((onend) => (...args) => {
+    releaseSession()
+    onend(...args)
+  })(recognition.onend)
   onCreated(recognition)
 
   try {
+    handlers.onDiagnostic?.({ event: 'start-requested', state: 'starting' })
     recognition.start()
     return recognition
-  } catch {
-    try {
-      recognition.lang = EMAIL_RECOGNITION_FALLBACK_LANGUAGE
-      handlers.onFallbackStart?.()
-      recognition.start()
-      return recognition
-    } catch {
-      handlers.onError('start-failed')
-      return null
-    }
+  } catch (error) {
+    releaseSession()
+    handlers.onDiagnostic?.({ event: 'start-failed', error: error?.name || 'unknown', state: 'unavailable' })
+    handlers.onError(getStartErrorCode(error))
+    return null
   }
+}
+
+function getStartErrorCode(error) {
+  switch (error?.name) {
+    case 'NotAllowedError':
+    case 'SecurityError':
+      return 'not-allowed'
+    case 'NotFoundError':
+    case 'DevicesNotFoundError':
+    case 'NotReadableError':
+    case 'TrackStartError':
+      return 'audio-capture'
+    case 'InvalidStateError':
+      return 'microphone-busy'
+    case 'NotSupportedError':
+      return 'language-not-supported'
+    default:
+      return 'start-failed'
+  }
+}
+
+export async function startEmailRecognitionAfterVoiceControl({
+  stopVoiceControl,
+  SpeechRecognition,
+  handlers,
+  onCreated,
+  shouldStart = () => true,
+}) {
+  try {
+    const stopped = await stopVoiceControl()
+    if (stopped === false) throw new Error('recognizer did not stop')
+  } catch {
+    if (!shouldStart()) return null
+    handlers.onError('voice-control-stop-failed')
+    return null
+  }
+  if (!shouldStart()) return null
+  return startEmailRecognition(SpeechRecognition, handlers, onCreated)
 }
