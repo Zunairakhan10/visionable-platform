@@ -18,6 +18,7 @@ function EventTimeline({ events }) {
   const [selectedEventId, setSelectedEventId] = useState(null)
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
   const recentEvents = [...events].sort((first, second) => new Date(second.timestamp) - new Date(first.timestamp)).slice(0, 6)
   const selectedEvent = recentEvents.find((event) => event.id === selectedEventId)
 
@@ -31,13 +32,15 @@ function EventTimeline({ events }) {
     setError('')
   }
 
-  const saveReview = (action) => {
+  const saveReview = async (action) => {
+    setSaving(true)
     try {
-      reviewMonitoringEvent(selectedEvent.id, action, note)
+      await reviewMonitoringEvent(selectedEvent.id, action, note)
       setError('')
-    } catch (reviewError) {
+    } catch {
       setError('The review could not be saved. Please try again.')
-      console.error('Monitoring event review could not be saved.', reviewError)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -55,7 +58,19 @@ function EventTimeline({ events }) {
             >
               <span className="timeline-content">
                 <span className="timeline-event-top"><strong>{event.type}</strong><time dateTime={event.timestamp}>{formatEventTime(event.timestamp)}</time></span>
-                <span className="timeline-event-meta"><span>Candidate: {event.candidateId}</span><span className={`event-review-status status-${event.status}`}>{getReviewStatusLabel(event)}</span></span>
+                <span className="timeline-event-meta">
+                  <span>Candidate: {event.candidateId}</span>
+                  <span className={`event-review-status status-${event.status}`}>{getReviewStatusLabel(event)}</span>
+                </span>
+                {event.syncStatus !== 'synced' ? (
+                  <span className={`event-sync-status${event.syncStatus === 'failed' || !event.syncStatus ? ' is-unsynced' : ''}`} role={event.syncStatus === 'failed' ? 'alert' : 'status'}>
+                    {event.syncStatus === 'pending'
+                      ? 'Saving to server…'
+                      : event.syncStatus === 'failed'
+                        ? 'Not saved to server'
+                        : 'Local demo only'}
+                  </span>
+                ) : <span className="event-sync-status">Saved to demo server</span>}
               </span>
             </button>
           </li>
@@ -72,8 +87,8 @@ function EventTimeline({ events }) {
             <textarea value={note} onChange={(event) => setNote(event.target.value)} rows="3" placeholder="Add context for the human review record" />
           </label>
           <div className="event-review-actions">
-            <button type="button" className="review-action-button" onClick={() => saveReview('no_issue')}>Mark reviewed / no issue</button>
-            <button type="button" className="review-action-button is-escalate" onClick={() => saveReview('escalated')}>Escalate</button>
+            <button type="button" className="review-action-button" onClick={() => saveReview('no_issue')} disabled={saving}>Mark reviewed / no issue</button>
+            <button type="button" className="review-action-button is-escalate" onClick={() => saveReview('escalated')} disabled={saving}>Escalate</button>
           </div>
           {error && <p className="event-review-error" role="alert">{error}</p>}
           {selectedEvent.review && !error && <p className="event-review-confirmation" role="status">Review saved for human follow-up.</p>}

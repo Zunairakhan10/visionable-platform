@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { getCandidateId, recordMonitoringEvent } from '../services/monitoringEventStore'
+import { createFaceDetector } from '../services/faceDetector.js'
 
-const FACE_DETECTOR_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite'
 const PRESENCE_STABILITY_MS = 1500
 const DETECTION_INTERVAL_MS = 200
 
@@ -67,6 +67,9 @@ export function useCameraMonitoring(isActive, onFeedback) {
         timestamp: new Date().toISOString(),
         severity: state === 'CANDIDATE_PRESENT' ? 'info' : 'warning',
         status: state === 'CANDIDATE_PRESENT' ? 'logged' : 'needs_review',
+      }).catch((error) => {
+        onFeedback('A camera presence event could not be saved to the demo server. You can continue the exam.', 'error')
+        console.error('Camera monitoring event could not be saved to the demo server.', error)
       })
     }
 
@@ -110,24 +113,7 @@ export function useCameraMonitoring(isActive, onFeedback) {
         await video.play()
         if (cancelled || cameraEnded) return
 
-        const [
-          { FaceDetector },
-          { default: wasmLoaderPath },
-          { default: wasmBinaryPath },
-        ] = await Promise.all([
-          import('@mediapipe/tasks-vision'),
-          import('@mediapipe/tasks-vision/vision_wasm_internal.js?url'),
-          import('@mediapipe/tasks-vision/vision_wasm_internal.wasm?url'),
-        ])
-
-        const loadedDetector = await FaceDetector.createFromOptions(
-          { wasmLoaderPath, wasmBinaryPath },
-          {
-            baseOptions: { modelAssetPath: FACE_DETECTOR_MODEL_URL },
-            runningMode: 'VIDEO',
-            minDetectionConfidence: 0.5,
-          }
-        )
+        const loadedDetector = await createFaceDetector()
         if (cancelled || cameraEnded) {
           loadedDetector.close()
           stopStream()
